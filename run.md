@@ -14,6 +14,8 @@ python main.py
  --epochs 50
  --dataset_file coco_powerline
  --batch_size 4
+ --num_classes 2
+ --num_queries 10
  --coco_path D:\dataset\coco_powerline_1
  --output_dir ./output
 ```
