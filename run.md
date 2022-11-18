@@ -1,0 +1,19 @@
+```shell
+python main.py
+ --coco_path D:\dataset\coco2017
+ --coco_panoptic_path D:\dataset\coco_panoptic
+ --masks
+ --dataset_file coco_panoptic 
+ --output_dir ./output
+```
+
+### Powerline Detection
+
+```shell
+python main.py
+ --epochs 50
+ --dataset_file coco_powerline
+ --batch_size 4
+ --coco_path D:\dataset\coco_powerline_1
+ --output_dir ./output
+```
