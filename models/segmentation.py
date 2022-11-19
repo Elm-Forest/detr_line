@@ -9,8 +9,8 @@ from typing import List, Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch import Tensor
 from PIL import Image
+from torch import Tensor
 
 import util.box_ops as box_ops
 from util.misc import NestedTensor, interpolate, nested_tensor_from_tensor_list
@@ -38,7 +38,7 @@ class DETRsegm(nn.Module):
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
         features, pos = self.detr.backbone(samples)
-
+        print('features:', len(features))
         bs = features[-1].tensors.shape[0]
 
         src, mask = features[-1].decompose()
@@ -275,7 +275,7 @@ class PostProcessPanoptic(nn.Module):
             return tuple(tup.cpu().tolist())
 
         for cur_logits, cur_masks, cur_boxes, size, target_size in zip(
-            out_logits, raw_masks, raw_boxes, processed_sizes, target_sizes
+                out_logits, raw_masks, raw_boxes, processed_sizes, target_sizes
         ):
             # we filter empty queries and detection below threshold
             scores, labels = cur_logits.softmax(-1).max(-1)
