@@ -11,11 +11,28 @@ python main.py
 
 ```shell
 python main.py
- --epochs 50
+ --epochs 500
  --dataset_file coco_powerline
- --batch_size 4
+ --batch_size 2
  --num_classes 2
  --num_queries 10
  --coco_path D:\dataset\coco_powerline_1
  --output_dir ./output
+ --resume ./output/checkpoint.pth
+```
+
+### Powerline Seg
+
+```shell
+python main.py
+ --masks
+ --epochs 500
+ --dataset_file powerline_seg
+ --batch_size 2
+ --num_classes 4
+ --num_queries 10
+ --coco_path D:\dataset\coco_powerline_1
+ --coco_panoptic_path D:\dataset\coco_powerline_1
+ --output_dir ./output/seg
+ --resume ./output/seg/checkpoint.pth
 ```
