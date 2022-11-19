@@ -20,6 +20,9 @@ def build_dataset(image_set, args):
         return build_coco(image_set, args)
     if args.dataset_file == 'coco_powerline':
         return build_powerline(image_set, args)
+    if args.dataset_file == "powerline_seg":
+        from .coco_panoptic import build_powerline_seg
+        return build_powerline_seg(image_set, args)
     if args.dataset_file == 'coco_panoptic':
         # to avoid making panopticapi required for coco
         from .coco_panoptic import build as build_coco_panoptic

@@ -3,7 +3,7 @@ import torch
 import torchvision.transforms as T
 
 CLASSES = [
-    'N/A', 'PL', 'TT'
+    'PL', 'TT', '2', '3'
 ]
 
 # colors for visualization
@@ -33,24 +33,11 @@ def rescale_bboxes(out_bbox, size):
     return b
 
 
-def detect(im, model, transform):
-    # mean-std normalize the input image (batch-size: 1)
+def detect(im, model, confidence):
     img = transform(im).unsqueeze(0)
-
-    # demo model only support by default images with aspect ratio between 0.5 and 2
-    # if you want to use images with an aspect ratio outside this range
-    # rescale your image so that the maximum size is at most 1333 for best results
-    assert img.shape[-2] <= 1600 and img.shape[
-        -1] <= 1600, 'demo model only supports images up to 1600 pixels on each side'
-
-    # propagate through the model
     outputs = model(img)
-
-    # keep only predictions with 0.7+ confidence
     probas = outputs['pred_logits'].softmax(-1)[0, :, :-1]
-    keep = probas.max(-1).values > 0.7
-
-    # convert boxes from [0; 1] to image scales
+    keep = probas.max(-1).values > confidence
     bboxes_scaled = rescale_bboxes(outputs['pred_boxes'][0, keep], im.size)
     return probas[keep], bboxes_scaled
 
@@ -63,6 +50,35 @@ def plot_results(pil_img, prob, boxes):
         ax.add_patch(plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin,
                                    fill=False, color=c, linewidth=3))
         cl = p.argmax()
+        text = f'{CLASSES[cl]}: {p[cl]:0.2f}'
+        ax.text(xmin, ymin, text, fontsize=15,
+                bbox=dict(facecolor='yellow', alpha=0.5))
+    plt.axis('off')
+    plt.show()
+
+
+def plot_result(pil_img, prob, boxes):
+    CLASSES = [
+        'PL', 'TT', '2', '3'
+    ]
+    COLORS = [[0.000, 0.447, 0.741], [0.850, 0.325, 0.098], [0.929, 0.694, 0.125],
+              [0.494, 0.184, 0.556], [0.466, 0.674, 0.188], [0.301, 0.745, 0.933]]
+    plt.figure(figsize=(16, 10))
+    plt.imshow(pil_img)
+    ax = plt.gca()
+    for p, (xmin, ymin, xmax, ymax), c in zip(prob, boxes.tolist(), COLORS * 100):
+        cl = p.argmax()
+        if cl != 0:
+            ax.add_patch(plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, fill=False, color=c, linewidth=3))
+        else:
+            import numpy as np
+            from matplotlib.path import Path
+            from matplotlib.patches import PathPatch
+            codes = [Path.MOVETO] + [Path.LINETO]
+            vertices = [(xmin, ymin), (xmax, ymax)]
+            vertices = np.array(vertices, float)
+            path = Path(vertices, codes)
+            ax.add_patch(PathPatch(path, color=c, linewidth=3))
         text = f'{CLASSES[cl]}: {p[cl]:0.2f}'
         ax.text(xmin, ymin, text, fontsize=15,
                 bbox=dict(facecolor='yellow', alpha=0.5))
