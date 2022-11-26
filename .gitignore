@@ -15,3 +15,9 @@ experiment-*
 .mypy_cache/*
 not_tracked_dir/
 .vscode
+/output/
+/result/
+
+
+/result/
+/result/json/
