@@ -363,3 +363,65 @@ def build(args):
             postprocessors["panoptic"] = PostProcessPanoptic(is_thing_map, threshold=0.85)
 
     return model, criterion, postprocessors
+
+
+checkpoint = None
+
+
+def build_detr_with_pretrained(args):
+    checkpoint = torch.hub.load_state_dict_from_url(
+        url='https://dl.fbaipublicfiles.com/detr/detr-r50-e632da11.pth',
+        map_location='cpu',
+        check_hash=True)
+    # print(checkpoint["model"])
+    args.num_queries = checkpoint["model"]['query_embed.weight'].shape[0]
+    del checkpoint["model"]["class_embed.weight"]
+    del checkpoint["model"]["class_embed.bias"]
+    if args.num_classes == 0:
+        num_classes = 20 if args.dataset_file != 'coco' else 91
+    else:
+        num_classes = args.num_classes + 1
+    if args.dataset_file == "coco_panoptic":
+        num_classes = 250
+    device = torch.device(args.device)
+    backbone = build_backbone(args)
+    transformer = build_transformer(args)
+    model = DETR(
+        backbone,
+        transformer,
+        num_classes=num_classes,
+        num_queries=args.num_queries,
+        aux_loss=args.aux_loss,
+    )
+    print('Transfer Learning Mode~~')
+
+    model.load_state_dict(checkpoint["model"], strict=False)
+    if args.masks:
+        model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))
+    matcher = build_matcher(args)
+    weight_dict = {'loss_ce': 1, 'loss_bbox': args.bbox_loss_coef}
+    weight_dict['loss_giou'] = args.giou_loss_coef
+    if args.masks:
+        weight_dict["loss_mask"] = args.mask_loss_coef
+        weight_dict["loss_dice"] = args.dice_loss_coef
+    # TODO this is a hack
+    if args.aux_loss:
+        aux_weight_dict = {}
+        for i in range(args.dec_layers - 1):
+            aux_weight_dict.update({k + f'_{i}': v for k, v in weight_dict.items()})
+        weight_dict.update(aux_weight_dict)
+
+    losses = ['labels', 'boxes', 'cardinality']
+    if args.masks:
+        losses += ["masks"]
+    criterion = SetCriterion(num_classes, matcher=matcher, weight_dict=weight_dict,
+                             eos_coef=args.eos_coef, losses=losses)
+    criterion.to(device)
+    postprocessors = {'bbox': PostProcess()}
+    if args.masks:
+        postprocessors['segm'] = PostProcessSegm()
+        if args.dataset_file == "coco_panoptic":
+            is_thing_map = {i: i <= 90 for i in range(201)}
+            postprocessors["panoptic"] = PostProcessPanoptic(is_thing_map, threshold=0.85)
+
+    return model, criterion, postprocessors

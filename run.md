@@ -34,3 +34,15 @@ python main.py
  --coco_path D:\dataset\coco_powerline_1
  --output_dir ./output/seg
 ```
+
+```shell
+python main.py
+ --epochs 500
+ --dataset_file coco_powerline_set
+ --batch_size 2
+ --num_classes 1
+ --num_queries 10
+ --coco_path D:\dataset\power_line_set\train
+ --transfer
+ --output_dir ./output/test
+```
