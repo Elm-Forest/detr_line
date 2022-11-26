@@ -4,13 +4,13 @@ import torch
 from models.backbone import Backbone, Joiner
 from models.detr import DETR, PostProcess
 from models.position_encoding import PositionEmbeddingSine
-from models.segmentation import DETRsegm, PostProcessPanoptic
+from models.segmentation import DETRsegm, PostProcessPanoptic, PostProcessSegm
 from models.transformer import Transformer
 
 dependencies = ["torch", "torchvision"]
 
 
-def _make_detr(backbone_name: str, dilation=False, num_classes=91, mask=False):
+def _make_detr(backbone_name: str, dilation=False, num_classes=91, mask=True):
     hidden_dim = 256
     backbone = Backbone(backbone_name, train_backbone=True, return_interm_layers=mask, dilation=dilation)
     pos_enc = PositionEmbeddingSine(hidden_dim // 2, normalize=True)
@@ -37,6 +37,16 @@ def detr_resnet50(pretrained=False, num_classes=91, return_postprocessor=False):
         model.load_state_dict(checkpoint["model"])
     if return_postprocessor:
         return model, PostProcess()
+    return model
+
+
+def detr_resnet50_seg(pretrained=False, num_classes=91, return_postprocessor=False, mask=True):
+    model = _make_detr("resnet50", dilation=False, num_classes=num_classes, mask=mask)
+    if pretrained:
+        checkpoint = torch.load("./detr-r50-panoptic-00ce5173.pth")
+        model.load_state_dict(checkpoint["model"])
+    if return_postprocessor:
+        return model, PostProcessSegm()
     return model
 
 
@@ -96,7 +106,7 @@ def detr_resnet101_dc5(pretrained=False, num_classes=91, return_postprocessor=Fa
 
 
 def detr_resnet50_panoptic(
-    pretrained=False, num_classes=250, threshold=0.85, return_postprocessor=False
+        pretrained=False, num_classes=250, threshold=0.85, return_postprocessor=False
 ):
     """
     DETR R50 with 6 encoder and 6 decoder layers.
@@ -119,7 +129,7 @@ def detr_resnet50_panoptic(
 
 
 def detr_resnet50_dc5_panoptic(
-    pretrained=False, num_classes=250, threshold=0.85, return_postprocessor=False
+        pretrained=False, num_classes=250, threshold=0.85, return_postprocessor=False
 ):
     """
     DETR-DC5 R50 with 6 encoder and 6 decoder layers.
@@ -145,7 +155,7 @@ def detr_resnet50_dc5_panoptic(
 
 
 def detr_resnet101_panoptic(
-    pretrained=False, num_classes=250, threshold=0.85, return_postprocessor=False
+        pretrained=False, num_classes=250, threshold=0.85, return_postprocessor=False
 ):
     """
     DETR-DC5 R101 with 6 encoder and 6 decoder layers.
