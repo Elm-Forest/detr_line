@@ -17,4 +17,4 @@ not_tracked_dir/
 .vscode
 /output/**
 /result/**
-/result/json/**
+/result/json/
