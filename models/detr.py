@@ -10,6 +10,7 @@ from util import box_ops
 from util.misc import (NestedTensor, nested_tensor_from_tensor_list,
                        accuracy, get_world_size, interpolate,
                        is_dist_avail_and_initialized)
+from .HT import built_CAT_HTIHT
 from .backbone import build_backbone
 from .matcher import build_matcher
 from .segmentation import (DETRsegm, PostProcessPanoptic, PostProcessSegm,
@@ -20,7 +21,7 @@ from .transformer import build_transformer
 class DETR(nn.Module):
     """ This is the DETR module that performs object detection """
 
-    def __init__(self, backbone, transformer, num_classes, num_queries, aux_loss=False):
+    def __init__(self, backbone, transformer, num_classes, num_queries, cat_htiht, aux_loss=False):
         """ Initializes the model.
         Parameters:
             backbone: torch module of the backbone to be used. See backbone.py
@@ -40,6 +41,7 @@ class DETR(nn.Module):
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.backbone = backbone
         self.aux_loss = aux_loss
+        self.cat_htiht = cat_htiht
 
     def forward(self, samples: NestedTensor):
         """ The forward expects a NestedTensor, which consists of:
@@ -62,7 +64,7 @@ class DETR(nn.Module):
 
         src, mask = features[-1].decompose()
         assert mask is not None
-        hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0]
+        hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1], HT=self.cat_htiht)[0]
 
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
@@ -303,7 +305,7 @@ class MLP(nn.Module):
         return x
 
 
-def build(args):
+def build(args, data_loader):
     # the `num_classes` naming here is somewhat misleading.
     # it indeed corresponds to `max_obj_id + 1`, where max_obj_id
     # is the maximum id for a class in your dataset. For example,
@@ -313,6 +315,16 @@ def build(args):
     # For more details on this, check the following discussion
     # https://github.com/facebookresearch/detr/issues/108#issuecomment-650269223
     # num_classes = 20 if args.dataset_file != 'coco' else 91
+
+    checkpoint = torch.hub.load_state_dict_from_url(
+        url='https://dl.fbaipublicfiles.com/detr/detr-r50-e632da11.pth',
+        map_location='cpu',
+        check_hash=True)
+    # print(checkpoint["model"])
+    args.num_queries = checkpoint["model"]['query_embed.weight'].shape[0]
+    del checkpoint["model"]["class_embed.weight"]
+    del checkpoint["model"]["class_embed.bias"]
+
     if args.num_classes == 0:
         num_classes = 20 if args.dataset_file != 'coco' else 91
     else:
@@ -324,7 +336,10 @@ def build(args):
     device = torch.device(args.device)
 
     backbone = build_backbone(args)
-
+    cat_htiht = built_CAT_HTIHT(data_loader,
+                                args.theta_res, args.rho_res, device,
+                                inplanes=args.num_queries,
+                                outplanes=args.num_queries)
     transformer = build_transformer(args)
 
     model = DETR(
@@ -333,7 +348,11 @@ def build(args):
         num_classes=num_classes,
         num_queries=args.num_queries,
         aux_loss=args.aux_loss,
+        cat_htiht=cat_htiht
     )
+    if args.transfer:
+        print('Transfer Learning Mode~~')
+        model.load_state_dict(checkpoint["model"], strict=False)
     if args.masks:
         model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))
     matcher = build_matcher(args)
@@ -364,64 +383,62 @@ def build(args):
 
     return model, criterion, postprocessors
 
+# checkpoint = None
 
-checkpoint = None
-
-
-def build_detr_with_pretrained(args):
-    checkpoint = torch.hub.load_state_dict_from_url(
-        url='https://dl.fbaipublicfiles.com/detr/detr-r50-e632da11.pth',
-        map_location='cpu',
-        check_hash=True)
-    # print(checkpoint["model"])
-    args.num_queries = checkpoint["model"]['query_embed.weight'].shape[0]
-    del checkpoint["model"]["class_embed.weight"]
-    del checkpoint["model"]["class_embed.bias"]
-    if args.num_classes == 0:
-        num_classes = 20 if args.dataset_file != 'coco' else 91
-    else:
-        num_classes = args.num_classes + 1
-    if args.dataset_file == "coco_panoptic":
-        num_classes = 250
-    device = torch.device(args.device)
-    backbone = build_backbone(args)
-    transformer = build_transformer(args)
-    model = DETR(
-        backbone,
-        transformer,
-        num_classes=num_classes,
-        num_queries=args.num_queries,
-        aux_loss=args.aux_loss,
-    )
-    print('Transfer Learning Mode~~')
-
-    model.load_state_dict(checkpoint["model"], strict=False)
-    if args.masks:
-        model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))
-    matcher = build_matcher(args)
-    weight_dict = {'loss_ce': 1, 'loss_bbox': args.bbox_loss_coef}
-    weight_dict['loss_giou'] = args.giou_loss_coef
-    if args.masks:
-        weight_dict["loss_mask"] = args.mask_loss_coef
-        weight_dict["loss_dice"] = args.dice_loss_coef
-    # TODO this is a hack
-    if args.aux_loss:
-        aux_weight_dict = {}
-        for i in range(args.dec_layers - 1):
-            aux_weight_dict.update({k + f'_{i}': v for k, v in weight_dict.items()})
-        weight_dict.update(aux_weight_dict)
-
-    losses = ['labels', 'boxes', 'cardinality']
-    if args.masks:
-        losses += ["masks"]
-    criterion = SetCriterion(num_classes, matcher=matcher, weight_dict=weight_dict,
-                             eos_coef=args.eos_coef, losses=losses)
-    criterion.to(device)
-    postprocessors = {'bbox': PostProcess()}
-    if args.masks:
-        postprocessors['segm'] = PostProcessSegm()
-        if args.dataset_file == "coco_panoptic":
-            is_thing_map = {i: i <= 90 for i in range(201)}
-            postprocessors["panoptic"] = PostProcessPanoptic(is_thing_map, threshold=0.85)
-
-    return model, criterion, postprocessors
+# def build_detr_with_pretrained(args):
+#     checkpoint = torch.hub.load_state_dict_from_url(
+#         url='https://dl.fbaipublicfiles.com/detr/detr-r50-e632da11.pth',
+#         map_location='cpu',
+#         check_hash=True)
+#     # print(checkpoint["model"])
+#     args.num_queries = checkpoint["model"]['query_embed.weight'].shape[0]
+#     del checkpoint["model"]["class_embed.weight"]
+#     del checkpoint["model"]["class_embed.bias"]
+#     if args.num_classes == 0:
+#         num_classes = 20 if args.dataset_file != 'coco' else 91
+#     else:
+#         num_classes = args.num_classes + 1
+#     if args.dataset_file == "coco_panoptic":
+#         num_classes = 250
+#     device = torch.device(args.device)
+#     backbone = build_backbone(args)
+#     transformer = build_transformer(args)
+#     model = DETR(
+#         backbone,
+#         transformer,
+#         num_classes=num_classes,
+#         num_queries=args.num_queries,
+#         aux_loss=args.aux_loss,
+#     )
+#     print('Transfer Learning Mode~~')
+#
+#     model.load_state_dict(checkpoint["model"], strict=False)
+#     if args.masks:
+#         model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))
+#     matcher = build_matcher(args)
+#     weight_dict = {'loss_ce': 1, 'loss_bbox': args.bbox_loss_coef}
+#     weight_dict['loss_giou'] = args.giou_loss_coef
+#     if args.masks:
+#         weight_dict["loss_mask"] = args.mask_loss_coef
+#         weight_dict["loss_dice"] = args.dice_loss_coef
+#     # TODO this is a hack
+#     if args.aux_loss:
+#         aux_weight_dict = {}
+#         for i in range(args.dec_layers - 1):
+#             aux_weight_dict.update({k + f'_{i}': v for k, v in weight_dict.items()})
+#         weight_dict.update(aux_weight_dict)
+#
+#     losses = ['labels', 'boxes', 'cardinality']
+#     if args.masks:
+#         losses += ["masks"]
+#     criterion = SetCriterion(num_classes, matcher=matcher, weight_dict=weight_dict,
+#                              eos_coef=args.eos_coef, losses=losses)
+#     criterion.to(device)
+#     postprocessors = {'bbox': PostProcess()}
+#     if args.masks:
+#         postprocessors['segm'] = PostProcessSegm()
+#         if args.dataset_file == "coco_panoptic":
+#             is_thing_map = {i: i <= 90 for i in range(201)}
+#             postprocessors["panoptic"] = PostProcessPanoptic(is_thing_map, threshold=0.85)
+#
+#     return model, criterion, postprocessors
