@@ -336,8 +336,8 @@ def build(args, data_loader):
     device = torch.device(args.device)
 
     backbone = build_backbone(args)
-    cat_htiht = built_CAT_HTIHT(data_loader,
-                                args.theta_res, args.rho_res, device,
+    cat_htiht = built_CAT_HTIHT(data_loader, backbone, args.hidden_dim,
+                                args.theta_res, args.rho_res, device=device,
                                 inplanes=args.num_queries,
                                 outplanes=args.num_queries)
     transformer = build_transformer(args)

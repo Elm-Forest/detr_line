@@ -185,11 +185,16 @@ def tes():
     plt.show()
 
 
-def built_CAT_HTIHT(data_loader, theta_res, rho_res, device, inplanes, outplanes):
+def built_CAT_HTIHT(data_loader, backbone, hidden_dim, theta_res, rho_res, device, inplanes, outplanes):
     images, _ = next(iter(data_loader))
-    image = images[0]
-    image_w, image_h = image.size(2), image.size(1)
-    vote_index = hough_transform(image_w, image_h, theta_res, rho_res)
+    if isinstance(images, (list, torch.Tensor)):
+        from util.misc import nested_tensor_from_tensor_list
+        images = nested_tensor_from_tensor_list(images)
+    features, pos = backbone(images)
+    src, _ = features[-1].decompose()
+    src = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)(src)
+    _, _, w, h = src.shape
+    vote_index = hough_transform(w, h, theta_res, rho_res)
     vote_index = torch.from_numpy(vote_index).float().contiguous().to(device)
     cat_htiht = CAT_HTIHT(vote_index, inplanes, outplanes)
     return cat_htiht

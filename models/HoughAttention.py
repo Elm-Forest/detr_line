@@ -457,11 +457,14 @@ def _scaled_dot_product_attention(
 
     if attn_mask is not None:
         attn += attn_mask
+    attn_ori = attn.clone()
     bc, qy, _ = attn.shape
     attn = attn.view(bc, qy, height, weight)
     attn = ht(attn)
     attn = attn.view(bc, qy, -1)
     attn = softmax(attn, dim=-1)
+    attn_ori = softmax(attn_ori, dim=-1)
+    attn = attn_ori + attn
     # attn = parameter_space_image_p.reshape(hd, qu, -1)
     if dropout_p > 0.0:
         attn = dropout(attn, p=dropout_p)
