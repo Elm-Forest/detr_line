@@ -200,6 +200,14 @@ def built_CAT_HTIHT(data_loader, backbone, hidden_dim, theta_res, rho_res, devic
     return cat_htiht
 
 
+def build_val_CAT_HTIHT(theta_res, rho_res, inplanes, outplanes):
+    w, h = 25, 25
+    vote_index = hough_transform(w, h, theta_res, rho_res)
+    vote_index = torch.from_numpy(vote_index).float().contiguous()
+    cat_htiht = CAT_HTIHT(vote_index, inplanes, outplanes)
+    return cat_htiht
+
+
 if __name__ == "__main__":
     ### Default settings: (128, 128, 3, 1)
     vote_index = hough_transform(rows=128, cols=128, theta_res=3, rho_res=1)
