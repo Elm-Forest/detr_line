@@ -119,8 +119,11 @@ class HTIHT(nn.Module):
 
         self.conv1 = nn.Sequential(
             *make_conv_block(inplanes, inplanes, kernel_size=(9, 1), padding=(4, 0), bias=True, groups=inplanes))
-        self.conv2 = nn.Sequential(*make_conv_block(inplanes, outplanes, kernel_size=(9, 1), padding=(4, 0), bias=True))
+        self.conv2 = nn.Sequential(
+            *make_conv_block(inplanes, inplanes * 2, kernel_size=(9, 1), padding=(4, 0), bias=True))
         self.conv3 = nn.Sequential(
+            *make_conv_block(inplanes * 2, outplanes, kernel_size=(9, 1), padding=(4, 0), bias=True))
+        self.conv4 = nn.Sequential(
             *make_conv_block(outplanes, outplanes, kernel_size=(9, 1), padding=(4, 0), bias=True))
 
         self.relu = nn.ReLU(inplace=True)
@@ -141,12 +144,14 @@ class HTIHT(nn.Module):
         self.conv1[0].weight.data.copy_(torch.from_numpy(z).unsqueeze(1).unsqueeze(3))
         nn.init.kaiming_normal_(self.conv2[0].weight, mode='fan_out', nonlinearity='relu')
         nn.init.kaiming_normal_(self.conv3[0].weight, mode='fan_out', nonlinearity='relu')
+        nn.init.kaiming_normal_(self.conv4[0].weight, mode='fan_out', nonlinearity='relu')
 
     def forward(self, x, **kwargs):
         out = self.ht(x)
         out = self.conv1(out)
         out = self.conv2(out)
         out = self.conv3(out)
+        out = self.conv4(out)
         out = self.iht(out)
         return out
 
@@ -158,7 +163,11 @@ class CAT_HTIHT(nn.Module):
         self.htiht = HTIHT(vote_index, inplanes, outplanes)
         self.bn = nn.BatchNorm2d(inplanes)
         self.relu = nn.ReLU(inplace=True)
-        self.conv_cat = nn.Conv2d(inplanes + outplanes, inplanes, kernel_size=3, padding=1, bias=False)
+        self.conv_cat = nn.Sequential(
+            nn.Conv2d(inplanes + outplanes, (inplanes + outplanes) * 2, kernel_size=3, padding=1, bias=False),
+            nn.ReLU(),
+            nn.Conv2d((inplanes + outplanes) * 2, inplanes, kernel_size=3, padding=1, bias=False)
+        )
 
     def forward(self, x):
         x = self.bn(x)
@@ -168,27 +177,32 @@ class CAT_HTIHT(nn.Module):
         return out
 
 
-def tes():
+def test():
     from matplotlib import pyplot as plt
     img = np.zeros((120, 100), dtype=np.uint8)
-    cv2.line(img, (30, 100), (70, 100), 255, 1)
+    cv2.line(img, (0, 100), (100, 100), 255, 1)
+    cv2.line(img, (25, 75), (75, 50), 255, 1)
     cv2.line(img, (45, 50), (55, 50), 255, 1)
-    cv2.circle(img, (80, 80), 10, 200, -1)
-    # 添加随机噪声
-    noise = np.random.randint(0, 30, size=(120, 100), dtype=np.uint8)  # 生成0-30之间的随机整数噪声
-    img = np.clip(img.astype(np.int16) + noise.astype(np.int16), 0, 255).astype(
-        np.uint8)  # 将图像与噪声相加，并限制值在0-255范围内
-
+    # cv2.circle(img, (80, 80), 10, 200, -1)
+    # 生成0-30之间的随机整数噪声
+    noise = np.random.randint(0, 30, size=(120, 100), dtype=np.uint8)
+    # 将图像与噪声相加，并限制值在0-255范围内
+    img = np.clip(img.astype(np.int16) + noise.astype(np.int16), 0, 255).astype(np.uint8)
     plt.imshow(img)
     plt.show()
+
     rows, cols = img.shape
-    vote_index = hough_transform(rows, cols, theta_res=3, rho_res=1)
+    vote_index = hough_transform(rows, cols, theta_res=1, rho_res=1)
     vote_index2 = torch.from_numpy(vote_index).float().contiguous()
     img_t = torch.from_numpy(img).float().contiguous()
     img_t = img_t.unsqueeze(0).unsqueeze(0)
     HT_map = HT(vote_index2)(img_t)
     IHT_map = IHT(vote_index2)(HT_map)
     plt.imshow(IHT_map.squeeze(0).squeeze(0))
+    plt.show()
+
+    feat = CAT_HTIHT(vote_index2, inplanes=1, outplanes=1)(img_t)
+    plt.imshow(feat.detach().numpy().squeeze(0).squeeze(0))
     plt.show()
     return vote_index2
 
@@ -214,7 +228,6 @@ def build_val_CAT_HTIHT(theta_res, rho_res, inplanes, outplanes):
     vote_index = torch.from_numpy(vote_index).float().contiguous()
     cat_htiht = CAT_HTIHT(vote_index, inplanes, outplanes)
     return cat_htiht
-
 
 # if __name__ == "__main__":
 #     ### Default settings: (128, 128, 3, 1)
