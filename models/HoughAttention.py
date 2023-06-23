@@ -108,7 +108,7 @@ class HoughAttention(Module):
     def forward(self, query: Tensor, key: Tensor, value: Tensor, key_padding_mask: Optional[Tensor] = None,
                 need_weights: bool = True, attn_mask: Optional[Tensor] = None,
                 height=None, weight=None, HT=None, attn_w_before=None) \
-            -> Tuple[Tensor, Optional[Tensor]]:
+            -> Tuple[Tensor, Optional[Tensor], Optional[Tensor]]:
         r"""
     Args:
         query: Query embeddings of shape :math:`(L, N, E_q)` when ``batch_first=False`` or :math:`(N, L, E_q)`
@@ -149,7 +149,7 @@ class HoughAttention(Module):
             query, key, value = [x.transpose(1, 0) for x in (query, key, value)]
 
         if not self._qkv_same_embed_dim:
-            attn_output, attn_output_weights = multi_head_attention_forward(
+            attn_output, attn_output_weights, attn_w_before = multi_head_attention_forward(
                 query, key, value, self.embed_dim, self.num_heads,
                 self.in_proj_weight, self.in_proj_bias,
                 self.bias_k, self.bias_v, self.add_zero_attn,
@@ -161,7 +161,7 @@ class HoughAttention(Module):
                 v_proj_weight=self.v_proj_weight,
                 height=height, weight=weight, HT=HT, attn_w_before=attn_w_before)
         else:
-            attn_output, attn_output_weights = multi_head_attention_forward(
+            attn_output, attn_output_weights, attn_w_before = multi_head_attention_forward(
                 query, key, value, self.embed_dim, self.num_heads,
                 self.in_proj_weight, self.in_proj_bias,
                 self.bias_k, self.bias_v, self.add_zero_attn,
@@ -171,9 +171,9 @@ class HoughAttention(Module):
                 attn_mask=attn_mask,
                 height=height, weight=weight, HT=HT, attn_w_before=attn_w_before)
         if self.batch_first:
-            return attn_output.transpose(1, 0), attn_output_weights
+            return attn_output.transpose(1, 0), attn_output_weights, attn_w_before
         else:
-            return attn_output, attn_output_weights
+            return attn_output, attn_output_weights, attn_w_before
 
 
 def multi_head_attention_forward(
@@ -202,7 +202,7 @@ def multi_head_attention_forward(
         static_v: Optional[Tensor] = None,
         height=None, weight=None,
         HT=None, attn_w_before=None
-) -> Tuple[Tensor, Optional[Tensor]]:
+) -> Tuple[Tensor, Optional[Tensor], Optional[Tensor]]:
     r"""
     Args:
         query, key, value: map a query and a set of key-value pairs to an output.
@@ -357,9 +357,12 @@ def multi_head_attention_forward(
         assert static_v is None, "bias cannot be added to static value."
         k = torch.cat([k, bias_k.repeat(1, bsz, 1)])
         v = torch.cat([v, bias_v.repeat(1, bsz, 1)])
+
         if attn_mask is not None:
+            from torch.nn.functional import pad
             attn_mask = pad(attn_mask, (0, 1))
         if key_padding_mask is not None:
+            from torch.nn.functional import pad
             key_padding_mask = pad(key_padding_mask, (0, 1))
     else:
         assert bias_k is None
@@ -430,15 +433,16 @@ def multi_head_attention_forward(
     attn_output, attn_output_weights = _scaled_dot_product_attention(q, k, v, attn_mask, dropout_p,
                                                                      height=height, weight=weight,
                                                                      ht=HT, attn_w_before=attn_w_before)
+    attn_w_before = attn_output_weights.clone()
     attn_output = attn_output.transpose(0, 1).contiguous().view(tgt_len, bsz, embed_dim)
     attn_output = linear(attn_output, out_proj_weight, out_proj_bias)
 
     if need_weights:
         # average attention weights over heads
         attn_output_weights = attn_output_weights.view(bsz, num_heads, tgt_len, src_len)
-        return attn_output, attn_output_weights.sum(dim=1) / num_heads
+        return attn_output, attn_output_weights.sum(dim=1) / num_heads, attn_w_before
     else:
-        return attn_output, None
+        return attn_output, None, None
 
 
 def _scaled_dot_product_attention(

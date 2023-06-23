@@ -171,7 +171,14 @@ class CAT_HTIHT(nn.Module):
 def tes():
     from matplotlib import pyplot as plt
     img = np.zeros((120, 100), dtype=np.uint8)
-    cv2.line(img, (0, 100), (100, 100), 255, 1)
+    cv2.line(img, (30, 100), (70, 100), 255, 1)
+    cv2.line(img, (45, 50), (55, 50), 255, 1)
+    cv2.circle(img, (80, 80), 10, 200, -1)
+    # 添加随机噪声
+    noise = np.random.randint(0, 30, size=(120, 100), dtype=np.uint8)  # 生成0-30之间的随机整数噪声
+    img = np.clip(img.astype(np.int16) + noise.astype(np.int16), 0, 255).astype(
+        np.uint8)  # 将图像与噪声相加，并限制值在0-255范围内
+
     plt.imshow(img)
     plt.show()
     rows, cols = img.shape
@@ -209,9 +216,9 @@ def build_val_CAT_HTIHT(theta_res, rho_res, inplanes, outplanes):
     return cat_htiht
 
 
-if __name__ == "__main__":
-    ### Default settings: (128, 128, 3, 1)
-    vote_index = hough_transform(rows=128, cols=128, theta_res=3, rho_res=1)
-    rows, cols, h, w = vote_index.shape
-    print('vote_index', vote_index.shape)
-    # sio.savemat('../../vote_index_128_31.mat', {'vote_index': vote_index})
+# if __name__ == "__main__":
+#     ### Default settings: (128, 128, 3, 1)
+#     vote_index = hough_transform(rows=128, cols=128, theta_res=3, rho_res=1)
+#     rows, cols, h, w = vote_index.shape
+#     print('vote_index', vote_index.shape)
+#     # sio.savemat('../../vote_index_128_31.mat', {'vote_index': vote_index})
