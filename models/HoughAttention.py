@@ -106,7 +106,8 @@ class HoughAttention(Module):
         super(HoughAttention, self).__setstate__(state)
 
     def forward(self, query: Tensor, key: Tensor, value: Tensor, key_padding_mask: Optional[Tensor] = None,
-                need_weights: bool = True, attn_mask: Optional[Tensor] = None, height=None, weight=None, HT=None) \
+                need_weights: bool = True, attn_mask: Optional[Tensor] = None,
+                height=None, weight=None, HT=None, attn_w_before=None) \
             -> Tuple[Tensor, Optional[Tensor]]:
         r"""
     Args:
@@ -158,7 +159,7 @@ class HoughAttention(Module):
                 attn_mask=attn_mask, use_separate_proj_weight=True,
                 q_proj_weight=self.q_proj_weight, k_proj_weight=self.k_proj_weight,
                 v_proj_weight=self.v_proj_weight,
-                height=height, weight=weight, HT=HT)
+                height=height, weight=weight, HT=HT, attn_w_before=attn_w_before)
         else:
             attn_output, attn_output_weights = multi_head_attention_forward(
                 query, key, value, self.embed_dim, self.num_heads,
@@ -168,7 +169,7 @@ class HoughAttention(Module):
                 training=self.training,
                 key_padding_mask=key_padding_mask, need_weights=need_weights,
                 attn_mask=attn_mask,
-                height=height, weight=weight, HT=HT)
+                height=height, weight=weight, HT=HT, attn_w_before=attn_w_before)
         if self.batch_first:
             return attn_output.transpose(1, 0), attn_output_weights
         else:
@@ -200,7 +201,7 @@ def multi_head_attention_forward(
         static_k: Optional[Tensor] = None,
         static_v: Optional[Tensor] = None,
         height=None, weight=None,
-        HT=None
+        HT=None, attn_w_before=None
 ) -> Tuple[Tensor, Optional[Tensor]]:
     r"""
     Args:
@@ -428,7 +429,7 @@ def multi_head_attention_forward(
     #
     attn_output, attn_output_weights = _scaled_dot_product_attention(q, k, v, attn_mask, dropout_p,
                                                                      height=height, weight=weight,
-                                                                     ht=HT)
+                                                                     ht=HT, attn_w_before=attn_w_before)
     attn_output = attn_output.transpose(0, 1).contiguous().view(tgt_len, bsz, embed_dim)
     attn_output = linear(attn_output, out_proj_weight, out_proj_bias)
 
@@ -448,7 +449,8 @@ def _scaled_dot_product_attention(
         dropout_p: float = 0.0,
         height=None,
         weight=None,
-        ht=None
+        ht=None,
+        attn_w_before=None
 ) -> Tuple[Tensor, Tensor]:
     B, Nt, E = q.shape
     q = q / math.sqrt(E)
@@ -458,14 +460,13 @@ def _scaled_dot_product_attention(
     if attn_mask is not None:
         attn += attn_mask
 
-    attn_ori = attn.clone()
-    bc, qy, _ = attn.shape
-    attn = attn.view(bc, qy, height, weight)
-    attn = ht(attn)
-    attn = attn.view(bc, qy, -1)
-    attn = softmax(attn, dim=-1)
-    attn_ori = softmax(attn_ori, dim=-1)
-    attn = attn_ori + attn
+    bc, qy, _ = attn_w_before.shape
+    attn_w_before = attn_w_before.view(bc, qy, height, weight)
+    attn_w_before = ht(attn_w_before)
+    attn_w_before = attn_w_before.view(bc, qy, -1)
+    # attn_w_before = softmax(attn_w_before, dim=-1)
+    # attn = softmax(attn, dim=-1)
+    attn = softmax(attn_w_before + attn, dim=-1)
 
     if dropout_p > 0.0:
         attn = dropout(attn, p=dropout_p)

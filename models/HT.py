@@ -183,6 +183,7 @@ def tes():
     IHT_map = IHT(vote_index2)(HT_map)
     plt.imshow(IHT_map.squeeze(0).squeeze(0))
     plt.show()
+    return vote_index2
 
 
 def built_CAT_HTIHT(data_loader, backbone, hidden_dim, theta_res, rho_res, device, inplanes, outplanes):
