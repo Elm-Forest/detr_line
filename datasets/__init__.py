@@ -2,7 +2,7 @@
 import torch.utils.data
 import torchvision
 
-from .coco import build as build_coco, build_powerline,build_powerline_set
+from .coco import build as build_coco, build_powerline, build_powerline_set
 
 
 def get_coco_api_from_dataset(dataset):
@@ -20,7 +20,7 @@ def build_dataset(image_set, args):
         return build_coco(image_set, args)
     if args.dataset_file == 'coco_powerline':
         return build_powerline(image_set, args)
-    if args.dataset_file=='coco_powerline_set':
+    if args.dataset_file == 'coco_powerline_set':
         return build_powerline_set(image_set, args)
     if args.dataset_file == "powerline_seg":
         from .coco_panoptic import build_powerline_seg
