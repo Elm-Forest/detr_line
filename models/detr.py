@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from util import box_ops
-from util.box_ops import line_angle
+from util.box_ops import line_angle, ea_score
 from util.misc import (NestedTensor, nested_tensor_from_tensor_list,
                        accuracy, get_world_size, interpolate,
                        is_dist_avail_and_initialized)
@@ -90,7 +90,7 @@ class SetCriterion(nn.Module):
         2) we supervise each pair of matched ground-truth / prediction (supervise class and box)
     """
 
-    def __init__(self, num_classes, matcher, weight_dict, eos_coef, losses):
+    def __init__(self, num_classes, matcher, weight_dict, eos_coef, losses, sample=None):
         """ Create the criterion.
         Parameters:
             num_classes: number of object categories, omitting the special no-object category
@@ -105,6 +105,7 @@ class SetCriterion(nn.Module):
         self.weight_dict = weight_dict
         self.eos_coef = eos_coef
         self.losses = losses
+        self.sample = sample
         empty_weight = torch.ones(self.num_classes + 1)
         empty_weight[-1] = self.eos_coef
         self.register_buffer('empty_weight', empty_weight)
@@ -181,6 +182,17 @@ class SetCriterion(nn.Module):
         losses = {'loss_angles': loss_angle}
         return losses
 
+    def loss_ea(self, outputs, targets, indices, num_boxes):
+        assert 'pred_boxes' in outputs
+        idx = self._get_src_permutation_idx(indices)
+        src_boxes = outputs['pred_boxes'][idx]
+        target_boxes = torch.cat([t['boxes'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+
+        score = ea_score(src_boxes, target_boxes, self.sample)
+        loss_ea = (1 - score) * 10
+        losses = {'loss_ea': loss_ea}
+        return losses
+
     def loss_masks(self, outputs, targets, indices, num_boxes):
         """Compute the losses related to the masks: the focal loss and the dice loss.
            targets dicts must contain the key "masks" containing a tensor of dim [nb_target_boxes, h, w]
@@ -228,7 +240,8 @@ class SetCriterion(nn.Module):
             'cardinality': self.loss_cardinality,
             'boxes': self.loss_boxes,
             'masks': self.loss_masks,
-            'lines': self.loss_angles
+            'lines': self.loss_angles,
+            'ea': self.loss_ea
         }
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
         return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
@@ -352,9 +365,10 @@ def build(args, data_loader):
         # max_obj_id + 1, but the exact value doesn't really matter
         num_classes = 250
     device = torch.device(args.device)
-
+    images, _ = next(iter(data_loader))
+    sample, _ = images.decompose()
     backbone = build_backbone(args)
-    cat_htiht = built_CAT_HTIHT(data_loader,
+    cat_htiht = built_CAT_HTIHT(sample,
                                 backbone,
                                 args.hidden_dim,
                                 args.theta_res,
@@ -382,6 +396,8 @@ def build(args, data_loader):
     weight_dict['loss_giou'] = args.giou_loss_coef
     if args.line_loss:
         weight_dict['loss_angles'] = args.line_loss_coef
+    if args.ea_loss:
+        weight_dict['loss_ea'] = args.ea_loss_coef
     if args.masks:
         weight_dict["loss_mask"] = args.mask_loss_coef
         weight_dict["loss_dice"] = args.dice_loss_coef
@@ -398,7 +414,7 @@ def build(args, data_loader):
     if args.masks:
         losses += ["masks"]
     criterion = SetCriterion(num_classes, matcher=matcher, weight_dict=weight_dict,
-                             eos_coef=args.eos_coef, losses=losses)
+                             eos_coef=args.eos_coef, losses=losses, sample=sample)
     criterion.to(device)
     postprocessors = {'bbox': PostProcess()}
     if args.masks:

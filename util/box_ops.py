@@ -93,7 +93,29 @@ def masks_to_boxes(masks):
 def line_angle(x):
     # x: [nb_target_boxes , 4]
     # 4: (center_x, center_y, w, h)
-    w = x[:, 2]  # 获取每个 batch 的 w
-    h = x[:, 3]  # 获取每个 batch 的 h
+    h = x[:, 2]  # 获取每个 batch 的 h
+    w = x[:, 3]  # 获取每个 batch 的 w
     unit_theta = 180 / math.pi
-    return (torch.atan(w / h) * unit_theta).unsqueeze(dim=1)
+    return (torch.atan(h / w) * unit_theta).unsqueeze(dim=1)
+
+
+def line_distance(x, y, std_x, std_y):
+    # x: [nb_target_boxes , 4]
+    # 4: (center_x, center_y, w, h)
+    xx = x[:, 0] / std_x
+    xy = x[:, 1] / std_x
+    yx = y[:, 0] / std_y
+    yy = y[:, 1] / std_y
+    abs_distance = torch.sqrt(torch.square(xx - yx) + torch.square(xy - yy)).unsqueeze(dim=1)
+    return abs_distance
+
+
+def ea_score(src_boxes, target_boxes, sample):
+    ax, ay = line_angle(src_boxes), line_angle(target_boxes)
+    loss_angle = torch.nn.functional.smooth_l1_loss(ax, ay)
+    _, _, std_h, std_w = sample.shape
+    loss_distance = line_distance(src_boxes, target_boxes, std_h, std_w)
+    s_theta = 1 - loss_angle / 90
+    s_distance = 1 - loss_distance
+    s = torch.square(s_theta * s_distance)
+    return s

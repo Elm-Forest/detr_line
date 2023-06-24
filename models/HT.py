@@ -250,11 +250,10 @@ def test():
     return vote_index2
 
 
-def built_CAT_HTIHT(data_loader, backbone, hidden_dim, theta_res, rho_res, device, inplanes, outplanes):
-    images, _ = next(iter(data_loader))
-    if isinstance(images, (list, torch.Tensor)):
+def built_CAT_HTIHT(sample, backbone, hidden_dim, theta_res, rho_res, device, inplanes, outplanes):
+    if isinstance(sample, (list, torch.Tensor)):
         from util.misc import nested_tensor_from_tensor_list
-        images = nested_tensor_from_tensor_list(images)
+        images = nested_tensor_from_tensor_list(sample)
     features, pos = backbone(images)
     src, _ = features[-1].decompose()
     src = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)(src)

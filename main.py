@@ -112,6 +112,8 @@ def get_args_parser():
     parser.add_argument('--dy_line_loss_up_value', default=0.15, type=float)
     parser.add_argument('--dy_line_loss_up_step', default=5, type=int)
     parser.add_argument('--dy_line_loss_max_value', default=1, type=float)
+    parser.add_argument('--ea_loss', action='store_true')
+    parser.add_argument('--ea_loss_coef', default=1, type=float)
     return parser
 
 
