@@ -133,11 +133,11 @@ class TransformerDecoder(nn.Module):
             if self.return_intermediate:
                 intermediate.append(self.norm(output))
 
-        output = self.last_layerlayer(output, memory, tgt_mask=tgt_mask,
-                                      memory_mask=memory_mask,
-                                      tgt_key_padding_mask=tgt_key_padding_mask,
-                                      memory_key_padding_mask=memory_key_padding_mask,
-                                      pos=pos, query_pos=query_pos)
+        output = self.last_layer(output, memory, tgt_mask=tgt_mask,
+                                 memory_mask=memory_mask,
+                                 tgt_key_padding_mask=tgt_key_padding_mask,
+                                 memory_key_padding_mask=memory_key_padding_mask,
+                                 pos=pos, query_pos=query_pos)
         if self.return_intermediate:
             intermediate.append(self.norm(output))
 
