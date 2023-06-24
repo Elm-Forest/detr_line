@@ -93,14 +93,21 @@ class TransformerEncoder(nn.Module):
         return output
 
 
+def _get_clones(module, N):
+    return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
+
+
+def _construct_decoder_layer(first, module, last, N):
+    layers = [copy.deepcopy(first)] + [copy.deepcopy(module) for i in range(N)] + [copy.deepcopy(last)]
+    return nn.ModuleList(layers)
+
+
 class TransformerDecoder(nn.Module):
 
     def __init__(self, decoder_first_layer, decoder_layer, decoder_last_layer, num_layers, norm=None,
                  return_intermediate=False):
         super().__init__()
-        self.first_layer = decoder_first_layer
-        self.layers = _get_clones(decoder_layer, num_layers)
-        self.last_layer = decoder_last_layer
+        self.layers = _construct_decoder_layer(decoder_first_layer, decoder_layer, decoder_last_layer, num_layers)
         self.num_layers = num_layers
         self.norm = norm
         self.return_intermediate = return_intermediate
@@ -116,14 +123,14 @@ class TransformerDecoder(nn.Module):
         output = tgt
         attn_output_weights = attn_begin
         intermediate = []
-        output, attn_output_weights = self.first_layer(output, memory, tgt_mask=tgt_mask,
-                                                       memory_mask=memory_mask,
-                                                       tgt_key_padding_mask=tgt_key_padding_mask,
-                                                       memory_key_padding_mask=memory_key_padding_mask,
-                                                       pos=pos, query_pos=query_pos)
+        output, attn_output_weights = self.layers[0](output, memory, tgt_mask=tgt_mask,
+                                                     memory_mask=memory_mask,
+                                                     tgt_key_padding_mask=tgt_key_padding_mask,
+                                                     memory_key_padding_mask=memory_key_padding_mask,
+                                                     pos=pos, query_pos=query_pos)
         if self.return_intermediate:
             intermediate.append(self.norm(output))
-        for layer in self.layers:
+        for layer in self.layers[1:-1]:
             output, attn_output_weights = layer(output, memory, tgt_mask=tgt_mask,
                                                 memory_mask=memory_mask,
                                                 tgt_key_padding_mask=tgt_key_padding_mask,
@@ -133,7 +140,7 @@ class TransformerDecoder(nn.Module):
             if self.return_intermediate:
                 intermediate.append(self.norm(output))
 
-        output = self.last_layer(output, memory, tgt_mask=tgt_mask,
+        output = self.layers[-1](output, memory, tgt_mask=tgt_mask,
                                  memory_mask=memory_mask,
                                  tgt_key_padding_mask=tgt_key_padding_mask,
                                  memory_key_padding_mask=memory_key_padding_mask,
