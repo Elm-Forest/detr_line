@@ -34,7 +34,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         if args.line_loss and args.dy_line_loss:
             criterion.weight_dict['loss_angles'] = min(
-                criterion.weight_dict['loss_angles'] + args.dy_line_loss_up_value * (epoch // args.dy_line_loss_up_step),
+                args.line_loss_coef + args.dy_line_loss_up_value * (epoch // args.dy_line_loss_up_step),
                 args.line_loss_coef * 10)
         weight_dict = criterion.weight_dict
         losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
