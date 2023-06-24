@@ -2,6 +2,8 @@
 """
 Utilities for bounding box manipulation and GIoU.
 """
+import math
+
 import torch
 from torchvision.ops.boxes import box_area
 
@@ -86,3 +88,12 @@ def masks_to_boxes(masks):
     y_min = y_mask.masked_fill(~(masks.bool()), 1e8).flatten(1).min(-1)[0]
 
     return torch.stack([x_min, y_min, x_max, y_max], 1)
+
+
+def line_angle(x):
+    # x: [nb_target_boxes , 4]
+    # 4: (center_x, center_y, w, h)
+    w = x[:, 2]  # 获取每个 batch 的 w
+    h = x[:, 3]  # 获取每个 batch 的 h
+    unit_theta = 90 / math.pi
+    return (torch.atan(w / h) * unit_theta).unsqueeze(dim=1)

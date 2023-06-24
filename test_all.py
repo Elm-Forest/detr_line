@@ -1,17 +1,18 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import io
 import unittest
+from typing import List
 
 import torch
 from torch import nn, Tensor
-from typing import List
 
+from hubconf import detr_resnet50, detr_resnet50_panoptic
+from models.backbone import Backbone
 from models.matcher import HungarianMatcher
 from models.position_encoding import PositionEmbeddingSine, PositionEmbeddingLearned
-from models.backbone import Backbone, Joiner, BackboneBase
 from util import box_ops
+from util.box_ops import line_angle
 from util.misc import nested_tensor_from_tensor_list
-from hubconf import detr_resnet50, detr_resnet50_panoptic
 
 # onnxruntime requires python 3.5 or above
 try:
@@ -31,6 +32,30 @@ class Tester(unittest.TestCase):
     def indices_torch2python(indices):
         return [(i.tolist(), j.tolist()) for i, j in indices]
 
+    @staticmethod
+    def _get_src_permutation_idx(self, indices):
+        # permute predictions following indices
+        batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])
+        src_idx = torch.cat([src for (src, _) in indices])
+        return batch_idx, src_idx
+
+    def test_angle_loss(self):
+        abs_distance = 1
+        ans = torch.tensor(8.6342) / 2
+        x = torch.tensor([
+            [2, 4, 6, 8],  # 第一个 batch 的 (center_x, center_y, w, h)
+            [1, 3, 5, 7],  # 第二个 batch 的 (center_x, center_y, w, h)
+            [9, 11, 13, 15]  # 第三个 batch 的 (center_x, center_y, w, h)
+        ])
+        xx = torch.tensor([
+            [2, 4, 6, 8 + abs_distance],  # 第一个 batch 的 (center_x, center_y, w, h)
+            [1, 3, 5, 7 + abs_distance],  # 第二个 batch 的 (center_x, center_y, w, h)
+            [9, 11, 13, 15 + abs_distance]  # 第三个 batch 的 (center_x, center_y, w, h)
+        ])
+        result2, result = line_angle(x), line_angle(xx)
+        loss = torch.nn.functional.mse_loss(result2, result)
+        self.assertEqual(round(loss.item(), 2), round(ans.item(), 2))
+
     def test_hungarian(self):
         n_queries, n_targets, n_classes = 100, 15, 91
         logits = torch.rand(1, n_queries, n_classes + 1)
@@ -40,8 +65,10 @@ class Tester(unittest.TestCase):
         matcher = HungarianMatcher()
         targets = [{'labels': tgt_labels, 'boxes': tgt_boxes}]
         indices_single = matcher({'pred_logits': logits, 'pred_boxes': boxes}, targets)
+
         indices_batched = matcher({'pred_logits': logits.repeat(2, 1, 1),
                                    'pred_boxes': boxes.repeat(2, 1, 1)}, targets * 2)
+        print(indices_batched[0])
         self.assertEqual(len(indices_single[0][0]), n_targets)
         self.assertEqual(len(indices_single[0][1]), n_targets)
         self.assertEqual(self.indices_torch2python(indices_single),

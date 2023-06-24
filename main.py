@@ -104,6 +104,7 @@ def get_args_parser():
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
     parser.add_argument('--theta_res', default=3, type=int)
     parser.add_argument('--rho_res', default=1, type=int)
+    parser.add_argument('--line_detection', action='store_true')
     return parser
 
 
