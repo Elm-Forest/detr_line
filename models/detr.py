@@ -176,7 +176,7 @@ class SetCriterion(nn.Module):
         target_boxes = torch.cat([t['boxes'][i] for t, (_, i) in zip(targets, indices)], dim=0)
         src_line_angle = line_angle(src_boxes)
         target_line_angle = line_angle(target_boxes)
-        loss_angle = F.mse_loss(src_line_angle, target_line_angle)
+        loss_angle = F.smooth_l1_loss(src_line_angle, target_line_angle)
 
         losses = {'loss_angles': loss_angle}
         return losses

@@ -40,8 +40,8 @@ class Tester(unittest.TestCase):
         return batch_idx, src_idx
 
     def test_angle_loss(self):
-        abs_distance = 1
-        ans = torch.tensor(8.6342) / 2
+        abs_distance = 5
+        ans = torch.tensor(10.4677)
         x = torch.tensor([
             [2, 4, 6, 8],  # 第一个 batch 的 (center_x, center_y, w, h)
             [1, 3, 5, 7],  # 第二个 batch 的 (center_x, center_y, w, h)
@@ -53,7 +53,7 @@ class Tester(unittest.TestCase):
             [9, 11, 13, 15 + abs_distance]  # 第三个 batch 的 (center_x, center_y, w, h)
         ])
         result2, result = line_angle(x), line_angle(xx)
-        loss = torch.nn.functional.mse_loss(result2, result)
+        loss = torch.nn.functional.smooth_l1_loss(result2, result)
         self.assertEqual(round(loss.item(), 2), round(ans.item(), 2))
 
     def test_hungarian(self):

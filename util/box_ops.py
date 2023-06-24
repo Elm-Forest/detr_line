@@ -95,5 +95,5 @@ def line_angle(x):
     # 4: (center_x, center_y, w, h)
     w = x[:, 2]  # 获取每个 batch 的 w
     h = x[:, 3]  # 获取每个 batch 的 h
-    unit_theta = 90 / math.pi
+    unit_theta = 180 / math.pi
     return (torch.atan(w / h) * unit_theta).unsqueeze(dim=1)
