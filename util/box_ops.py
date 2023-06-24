@@ -112,7 +112,7 @@ def line_distance(x, y, std_x, std_y):
 
 def ea_score(src_boxes, target_boxes, sample):
     ax, ay = line_angle(src_boxes), line_angle(target_boxes)
-    loss_angle = torch.nn.functional.smooth_l1_loss(ax, ay)
+    loss_angle = torch.nn.functional.smooth_l1_loss(ax, ay, reduction='none')
     _, _, std_h, std_w = sample.shape
     loss_distance = line_distance(src_boxes, target_boxes, std_h, std_w)
     s_theta = 1 - loss_angle / 90

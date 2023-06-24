@@ -190,7 +190,7 @@ class SetCriterion(nn.Module):
 
         score = ea_score(src_boxes, target_boxes, self.sample)
         loss_ea = (1 - score) * 10
-        losses = {'loss_ea': loss_ea}
+        losses = {'loss_ea': loss_ea.sum() / num_boxes}
         return losses
 
     def loss_masks(self, outputs, targets, indices, num_boxes):
