@@ -393,7 +393,7 @@ def build(args, data_loader):
         weight_dict.update(aux_weight_dict)
 
     losses = ['labels', 'boxes', 'cardinality']
-    if args.line_detection:
+    if args.line_loss:
         losses += ["lines"]
     if args.masks:
         losses += ["masks"]

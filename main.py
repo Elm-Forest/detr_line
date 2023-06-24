@@ -102,6 +102,8 @@ def get_args_parser():
     parser.add_argument('--world_size', default=1, type=int,
                         help='number of distributed processes')
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
+
+    # line detection
     parser.add_argument('--theta_res', default=3, type=int)
     parser.add_argument('--rho_res', default=1, type=int)
     parser.add_argument('--line_loss', action='store_true')
