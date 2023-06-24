@@ -156,11 +156,50 @@ class HTIHT(nn.Module):
         return out
 
 
+class HT2IHT(nn.Module):
+    def __init__(self, vote_index, inplanes, outplanes):
+        super(HT2IHT, self).__init__()
+
+        self.conv1 = nn.Sequential(
+            *make_conv_block(inplanes, inplanes, kernel_size=(9, 1), padding=(4, 0), bias=True, groups=inplanes))
+        self.convs = nn.Sequential(
+            nn.Conv2d(inplanes, inplanes, 3, 1, 1),
+            nn.BatchNorm2d(inplanes),
+            nn.ReLU(),
+            nn.Conv2d(inplanes, inplanes, 3, 1, 1),
+            nn.BatchNorm2d(inplanes),
+            nn.ReLU()
+        )
+        self.relu = nn.ReLU(inplace=True)
+        self.tanh = nn.Tanh()
+        self.ht = HT(vote_index)
+        self.iht = IHT(vote_index)
+
+        filtersize = 4
+        x = np.zeros(shape=((2 * filtersize + 1)))
+        x[filtersize] = 1
+        z = []
+        for _ in range(0, inplanes):
+            sigma = np.random.uniform(low=1, high=2.5, size=(1))
+            y = ndimage.filters.gaussian_filter(x, sigma=sigma, order=2)
+            y = -y / np.sum(np.abs(y))
+            z.append(y)
+        z = np.stack(z)
+        self.conv1[0].weight.data.copy_(torch.from_numpy(z).unsqueeze(1).unsqueeze(3))
+
+    def forward(self, x, **kwargs):
+        out = self.ht(x)
+        out = self.conv1(out)
+        out = self.convs(out)
+        out = self.iht(out)
+        return out
+
+
 class CAT_HTIHT(nn.Module):
 
     def __init__(self, vote_index, inplanes, outplanes):
         super(CAT_HTIHT, self).__init__()
-        self.htiht = HTIHT(vote_index, inplanes, outplanes)
+        self.htiht = HT2IHT(vote_index, inplanes, outplanes)
         self.bn = nn.BatchNorm2d(inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.conv_cat = nn.Sequential(
@@ -197,6 +236,10 @@ def test():
     img_t = torch.from_numpy(img).float().contiguous()
     img_t = img_t.unsqueeze(0).unsqueeze(0)
     HT_map = HT(vote_index2)(img_t)
+    ht_g = HT_map.squeeze(0).squeeze(0)
+    print(HT_map.squeeze(0).squeeze(0).shape)
+    plt.imshow(ht_g)
+    plt.show()
     IHT_map = IHT(vote_index2)(HT_map)
     plt.imshow(IHT_map.squeeze(0).squeeze(0))
     plt.show()
