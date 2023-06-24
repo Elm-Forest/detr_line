@@ -346,7 +346,7 @@ class TransformerDecoderFirstLayer(nn.Module):
         tgt2, _, attn_w_before = self.multihead_attn(query=self.with_pos_embed(tgt, query_pos),
                                                      key=self.with_pos_embed(memory, pos),
                                                      value=memory, attn_mask=memory_mask,
-                                                     key_padding_mask=memory_key_padding_mask)[0]
+                                                     key_padding_mask=memory_key_padding_mask)
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
