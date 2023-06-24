@@ -103,8 +103,8 @@ def line_distance(x, y, std_x, std_y):
     # x: [nb_target_boxes , 4]
     # 4: (center_x, center_y, w, h)
     xx = x[:, 0] / std_x
-    xy = x[:, 1] / std_x
-    yx = y[:, 0] / std_y
+    xy = x[:, 1] / std_y
+    yx = y[:, 0] / std_x
     yy = y[:, 1] / std_y
     abs_distance = torch.sqrt(torch.square(xx - yx) + torch.square(xy - yy)).unsqueeze(dim=1)
     return abs_distance
