@@ -33,7 +33,7 @@ def get_args():
     parser.add_argument('--hidden_dim', type=int, default=256, help='Number of hidden channels')
     parser.add_argument('--num_class', type=int, default=1, help='Number of classes')
     parser.add_argument('--weight_decay', type=float, default=1e-8, help='Weight decay')
-
+    parser.add_argument('--dir_checkpoint', type=str, default=False, help='Load model from a .pth file')
     return parser.parse_args()
 
 
