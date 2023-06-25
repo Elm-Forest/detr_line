@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 from pathlib import Path
 
 import torch
@@ -33,7 +34,7 @@ def get_args():
     parser.add_argument('--hidden_dim', type=int, default=256, help='Number of hidden channels')
     parser.add_argument('--num_class', type=int, default=1, help='Number of classes')
     parser.add_argument('--weight_decay', type=float, default=1e-8, help='Weight decay')
-    parser.add_argument('--dir_checkpoint', type=str, default=False, help='Load model from a .pth file')
+    parser.add_argument('--dir_checkpoint', type=str, help='save weights')
     parser.add_argument('--coco_path', type=str, default=False, help='coco_path')
     return parser.parse_args()
 
@@ -213,5 +214,6 @@ if __name__ == '__main__':
 
         Path(args.dir_checkpoint).mkdir(parents=True, exist_ok=True)
         state_dict = model.state_dict()
-        torch.save(state_dict, str(args.dir_checkpoint / 'checkpoint_epoch{}.pth'.format(epoch)))
+        checkpoint_path = os.path.join(args.dir_checkpoint, 'checkpoint_epoch{}.pth'.format(epoch))
+        torch.save(state_dict, checkpoint_path)
         logging.info(f'Checkpoint {epoch} saved!')
