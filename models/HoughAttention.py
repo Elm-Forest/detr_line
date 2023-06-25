@@ -315,10 +315,10 @@ def multi_head_attention_forward(
     #
     # (deep breath) calculate attention and out projection
     #
-    attn_output, attn_output_weights = _scaled_dot_product_attention(q, k, v, attn_mask, dropout_p,
-                                                                     height=height, weight=weight,
-                                                                     ht=HT, attn_w_before=attn_w_before)
-    attn_w_before = attn_output_weights.clone()
+    attn_output, attn_output_weights, attn_content = _scaled_dot_product_attention(q, k, v, attn_mask, dropout_p,
+                                                                                   height=height, weight=weight,
+                                                                                   ht=HT, attn_w_before=attn_w_before)
+    attn_w_before = attn_content.clone()
     attn_output = attn_output.transpose(0, 1).contiguous().view(tgt_len, bsz, embed_dim)
     attn_output = linear(attn_output, out_proj_weight, out_proj_bias)
 
@@ -340,7 +340,7 @@ def _scaled_dot_product_attention(
         weight=None,
         ht=None,
         attn_w_before=None
-) -> Tuple[Tensor, Tensor]:
+) -> Tuple[Tensor, Tensor, Tensor]:
     B, Nt, E = q.shape
     q = q / math.sqrt(E)
     # (B, Nt, E) x (B, E, Ns) -> (B, Nt, Ns)
@@ -353,7 +353,7 @@ def _scaled_dot_product_attention(
     attn_w_before = attn_w_before.view(bc, qy, height, weight)
     attn_w_before = ht(attn_w_before)
     # 　attn_w_before = attn_w_before.view(bc, qy, -1)
-    attn = attn_w_before.view(bc, qy, -1)
+    attn = attn_content = attn_w_before.view(bc, qy, -1) + attn
     # attn_w_before = softmax(attn_w_before, dim=-1)
     attn = softmax(attn, dim=-1)
     # attn = softmax(attn_w_before + attn, dim=-1)
@@ -362,7 +362,7 @@ def _scaled_dot_product_attention(
         attn = dropout(attn, p=dropout_p)
     # (B, Nt, Ns) x (B, Ns, E) -> (B, Nt, E)
     output = torch.bmm(attn, v)
-    return output, attn
+    return output, attn, attn_content
 
 
 def _in_projection(
