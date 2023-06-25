@@ -38,13 +38,13 @@ class DETRsegm(nn.Module):
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
         features, pos = self.detr.backbone(samples)
-        print('features:', len(features))
         bs = features[-1].tensors.shape[0]
 
         src, mask = features[-1].decompose()
         assert mask is not None
         src_proj = self.detr.input_proj(src)
-        hs, memory = self.detr.transformer(src_proj, mask, self.detr.query_embed.weight, pos[-1], HT=self.detr.cat_htiht)
+        hs, memory = self.detr.transformer(src_proj, mask, self.detr.query_embed.weight, pos[-1],
+                                           HT=self.detr.cat_htiht)
 
         outputs_class = self.detr.class_embed(hs)
         outputs_coord = self.detr.bbox_embed(hs).sigmoid()
@@ -155,6 +155,7 @@ class MHAttentionMap(nn.Module):
         nn.init.xavier_uniform_(self.q_linear.weight)
         self.normalize_fact = float(hidden_dim / self.num_heads) ** -0.5
 
+    # self.bbox_attention(hs[-1], memory, mask=mask)
     def forward(self, q, k, mask: Optional[Tensor] = None):
         q = self.q_linear(q)
         k = F.conv2d(k, self.k_linear.weight.unsqueeze(-1).unsqueeze(-1), self.k_linear.bias)

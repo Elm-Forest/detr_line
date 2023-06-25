@@ -18,3 +18,5 @@ not_tracked_dir/
 /output/**
 /result/**
 /result/json/
+/models/unet/wandb/
+/models/Pytorch-UNet/
