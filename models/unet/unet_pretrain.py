@@ -75,7 +75,7 @@ def evaluate(net, dataloader, device, amp):
                 .bool() \
                 .squeeze(1) \
                 .to(device=device, dtype=torch.long)
-            mask_pred = model(samples)
+            mask_pred = model(samples).squeeze(1)
             if model.n_classes == 1:
                 assert mask_true.min() >= 0 and mask_true.max() <= 1, 'True mask indices should be in [0, 1]'
                 mask_pred = (F.sigmoid(mask_pred) > 0.5).float()
@@ -152,9 +152,9 @@ if __name__ == '__main__':
                 .bool() \
                 .squeeze(1) \
                 .to(device=device, dtype=torch.long)
-            masks_pred = model(samples)
+            masks_pred = model(samples).squeeze(1)
             if model.n_classes == 1:
-                loss = criterion(masks_pred.squeeze(1), true_masks.float())
+                loss = criterion(masks_pred, true_masks.float())
                 loss += dice_loss(F.sigmoid(masks_pred.squeeze(1)), true_masks.float(), multiclass=False)
             else:
                 loss = criterion(masks_pred, true_masks)
