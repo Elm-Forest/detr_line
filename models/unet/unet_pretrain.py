@@ -34,6 +34,7 @@ def get_args():
     parser.add_argument('--num_class', type=int, default=1, help='Number of classes')
     parser.add_argument('--weight_decay', type=float, default=1e-8, help='Weight decay')
     parser.add_argument('--dir_checkpoint', type=str, default=False, help='Load model from a .pth file')
+    parser.add_argument('--coco_path', type=str, default=False, help='coco_path')
     return parser.parse_args()
 
 
@@ -95,7 +96,6 @@ def evaluate(net, dataloader, device, amp):
 def init(args):
     args.masks = True
     args.dataset_file = 'coco_powerline'
-    args.coco_path = 'D:/dataset/coco_powerline_1'
     args.distributed = False
     args.num_workers = 2
     return args
