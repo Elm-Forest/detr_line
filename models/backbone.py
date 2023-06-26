@@ -2,17 +2,16 @@
 """
 Backbone modules.
 """
-from collections import OrderedDict
+
+from typing import Dict, List
 
 import torch
 import torch.nn.functional as F
 import torchvision
 from torch import nn
 from torchvision.models._utils import IntermediateLayerGetter
-from typing import Dict, List
 
 from util.misc import NestedTensor, is_main_process
-
 from .position_encoding import build_position_encoding
 
 
@@ -82,6 +81,7 @@ class BackboneBase(nn.Module):
 
 class Backbone(BackboneBase):
     """ResNet backbone with frozen BatchNorm."""
+
     def __init__(self, name: str,
                  train_backbone: bool,
                  return_interm_layers: bool,

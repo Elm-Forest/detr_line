@@ -20,7 +20,8 @@ class Houghformer(nn.Module):
     def __init__(self, d_model=512, nhead=8, num_encoder_layers=6,
                  num_decoder_layers=6, dim_feedforward=2048, dropout=0.1,
                  activation="relu", normalize_before=False,
-                 return_intermediate_dec=False):
+                 return_intermediate_dec=False,
+                 dht_layer=None, iht_Layer=None):
         super().__init__()
 
         encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward,
@@ -34,6 +35,9 @@ class Houghformer(nn.Module):
         self.decoder = TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm,
                                           return_intermediate=return_intermediate_dec)
 
+        self.dht_layer = dht_layer
+        self.iht_Layer = iht_Layer
+
         self._reset_parameters()
 
         self.d_model = d_model
@@ -44,7 +48,7 @@ class Houghformer(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, src, mask, query_embed, pos_embed, HT):
+    def forward(self, src, mask, query_embed, pos_embed):
         # flatten NxCxHxW to HWxNxC
         bs, c, h, w = src.shape
         src = src.flatten(2).permute(2, 0, 1)
@@ -53,10 +57,10 @@ class Houghformer(nn.Module):
         mask = mask.flatten(1)
         tgt = torch.zeros_like(query_embed)
         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
-        memory1 = memory.clone().permute(1, 2, 0)
-        memory1 = memory1.reshape(bs, c, h, w)
-        memory1 = HT(memory1)
-        memory = memory1.flatten(2).permute(2, 0, 1)
+        memory = memory.clone().permute(1, 2, 0)
+        memory = memory.reshape(bs, c, h, w)
+        memory = self.dht_layer(memory)
+        memory = memory.flatten(2).permute(2, 0, 1)
         hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
                           pos=pos_embed, query_pos=query_embed)
         return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
@@ -276,7 +280,7 @@ def _get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
 
 
-def build_transformer(args):
+def build_houghformer(args, dht_layer, iht_Layer):
     return Houghformer(
         d_model=args.hidden_dim,
         dropout=args.dropout,
@@ -286,6 +290,8 @@ def build_transformer(args):
         num_decoder_layers=args.dec_layers,
         normalize_before=args.pre_norm,
         return_intermediate_dec=True,
+        dht_layer=dht_layer,
+        iht_Layer=iht_Layer
     )
 
 

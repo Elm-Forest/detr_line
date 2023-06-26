@@ -66,6 +66,35 @@ def hough_transform(rows, cols, theta_res, rho_res):
     return vote_index.reshape(rows, cols, h, w)
 
 
+def inverse_hough_transform(h, w, rows, cols, theta_res, rho_res):
+    theta = np.linspace(0, 180.0, int(np.ceil(180.0 / theta_res) + 1.0))
+    theta = theta[0:len(theta) - 1]
+
+    D = np.sqrt((rows - 1) ** 2 + (cols - 1) ** 2)
+    q = np.ceil(D / rho_res)
+    nrho = 2 * q + 1
+    rho = np.linspace(-q * rho_res, q * rho_res, int(nrho))
+
+    cos_value = np.cos(theta * np.pi / 180.0).astype(np.float32)
+    sin_value = np.sin(theta * np.pi / 180.0).astype(np.float32)
+    sin_cos = np.concatenate((sin_value[None, :], cos_value[None, :]), axis=0)
+
+    inverse_map = np.zeros((h, w, rows, cols))
+
+    for i in range(h):
+        for j in range(w):
+            a = cos_value[j]
+            b = sin_value[j]
+            x0 = a * rho[i]
+            y0 = b * rho[i]
+            for x in range(rows):
+                for y in range(cols):
+                    if abs(a * x + b * y - rho[i]) < 1e-5:
+                        inverse_map[i, j, x, y] = 1
+
+    return inverse_map
+
+
 # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True)
 def make_conv_block(in_channels, out_channels, kernel_size=3, stride=1, padding=0, dilation=1, groups=1, bias=False):
     layers = []
@@ -154,6 +183,47 @@ class HTIHT(nn.Module):
         out = self.conv4(out)
         out = self.iht(out)
         return out
+
+
+class DHT_Layer(nn.Module):
+    def __init__(self, vote_index, inplanes, outplanes):
+        super(DHT_Layer, self).__init__()
+        self.fist_conv = nn.Sequential(
+            nn.Conv2d(inplanes, outplanes, 1),
+            nn.BatchNorm2d(outplanes),
+            nn.ReLU()
+        )
+        self.ht = HT(vote_index)
+
+    def forward(self, x):
+        x = self.fist_conv(x)
+        x = self.ht(x)
+        return x
+
+
+class IHT_Layer(nn.Module):
+    def __init__(self, vote_index, inplanes, outplanes):
+        super(IHT_Layer, self).__init__()
+        self.fist_conv = nn.Sequential(
+            nn.Conv2d(inplanes, outplanes, 1),
+            nn.BatchNorm2d(outplanes),
+            nn.ReLU()
+        )
+        self.iht = IHT(vote_index)
+        self.convs = nn.Sequential(
+            nn.Conv2d(outplanes, outplanes, 3, 1, 1),
+            nn.BatchNorm2d(outplanes),
+            nn.ReLU(),
+            nn.Conv2d(outplanes, outplanes, 3, 1, 1),
+            nn.BatchNorm2d(outplanes),
+            nn.ReLU()
+        )
+
+    def forward(self, x):
+        x = self.fist_conv(x)
+        x = self.iht(x)
+        x = self.convs(x)
+        return x
 
 
 class HT2IHT(nn.Module):
@@ -257,8 +327,8 @@ def built_CAT_HTIHT(sample, backbone, hidden_dim, theta_res, rho_res, device, in
     features, pos = backbone(images)
     src, _ = features[-1].decompose()
     src = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)(src)
-    _, _, w, h = src.shape
-    vote_index = hough_transform(w, h, theta_res, rho_res)
+    _, _, h, w = src.shape
+    vote_index = hough_transform(h, w, theta_res, rho_res)
     vote_index = torch.from_numpy(vote_index).float().contiguous().to(device)
     cat_htiht = CAT_HTIHT(vote_index, inplanes, outplanes)
     return cat_htiht

@@ -11,7 +11,8 @@ from torch.utils.data import DataLoader, DistributedSampler
 
 import util.misc as utils
 from datasets import build_dataset
-from models.unet import UNet
+from models.backbone import build_backbone
+from models.unet.TransUNet import TransUNet
 from models.unet.dice_score import dice_loss, dice_coeff, multiclass_dice_coeff
 
 
@@ -99,17 +100,34 @@ def init(args):
     args.dataset_file = 'coco_powerline'
     args.distributed = False
     args.num_workers = 2
+    args.position_embedding = 'sine'
+    args.hidden_dim = 256
+    args.backbone = 'resnet34'
+    args.lr_backbone = 1e-5
+    args.dilation = False
+    args.epochs = 5
+    # args.batch_size = 1
+    # args.lr = 1e-4
+    # args.coco_path = 'D:\dataset\coco_powerline_1'
+    args.dir_checkpoint = './output'
     return args
 
 
 if __name__ == '__main__':
     args = get_args()
-    init(args)
+    args = init(args)
     in_channels = args.hidden_dim
     out_channels = in_channels
     n_classes = args.num_class
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = UNet(in_channels, out_channels, n_classes, bilinear=False)
+    # 　model = UNet(in_channels, out_channels, n_classes, bilinear=False)
+
+    backbone = build_backbone(args)
+    backbone[0].body.maxpool = backbone[0].body.relu
+    model = TransUNet(backbone,
+                      num_classes=n_classes,
+                      in_channels=512,
+                      d_model=args.hidden_dim)
     model = model.to(memory_format=torch.channels_last)
 
     logging.info(f'Network:\n'
@@ -149,6 +167,8 @@ if __name__ == '__main__':
             samples = samples.tensors.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
             targets = [{k: v for k, v in t.items()} for t in targets]
             masks = [t["masks"] for t in targets]
+            # 处理coco实例分割掩码
+            # 实例mask累加-->语义mask
             true_masks = torch.stack([tensor.sum(dim=0, keepdim=True) for tensor in masks], dim=0) \
                 .bool() \
                 .squeeze(1) \
@@ -181,16 +201,16 @@ if __name__ == '__main__':
             })
 
             # Evaluation round
-            division_step = 300
+            division_step = 3
 
             if global_step % division_step == 0:
                 histograms = {}
-                for tag, value in model.named_parameters():
-                    tag = tag.replace('/', '.')
-                    if not (torch.isinf(value) | torch.isnan(value)).any():
-                        histograms['Weights/' + tag] = wandb.Histogram(value.data.cpu())
-                    if not (torch.isinf(value.grad) | torch.isnan(value.grad)).any():
-                        histograms['Gradients/' + tag] = wandb.Histogram(value.grad.data.cpu())
+                # for tag, value in model.named_parameters():
+                #     tag = tag.replace('/', '.')
+                #     if not (torch.isinf(value) | torch.isnan(value)).any():
+                #         histograms['Weights/' + tag] = wandb.Histogram(value.data.cpu())
+                #     if not (torch.isinf(value.grad) | torch.isnan(value.grad)).any():
+                #         histograms['Gradients/' + tag] = wandb.Histogram(value.grad.data.cpu())
 
                 val_score = evaluate(model, data_loader_val, device, False)
                 scheduler.step(val_score)
