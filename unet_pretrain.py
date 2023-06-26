@@ -105,6 +105,7 @@ def init(args):
     args.lr_backbone = 1e-5
     args.dilation = False
     args.epochs = 5
+    args.amp = True
     # args.batch_size = 1
     # args.lr = 1e-4
     # args.coco_path = 'D:\dataset\coco_powerline_1'
@@ -146,7 +147,7 @@ if __name__ == '__main__':
     optimizer = optim.RMSprop(model.parameters(),
                               lr=args.learning_rate, weight_decay=args.weight_decay, momentum=0.999)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=5)  # goal: maximize Dice score
-    grad_scaler = torch.cuda.amp.GradScaler(enabled=False)
+    grad_scaler = torch.cuda.amp.GradScaler(enabled=args.amp)
     global_step = 0
     # sample = next(iter(data_loader_train))
     # a, b = sample
@@ -155,7 +156,7 @@ if __name__ == '__main__':
     experiment = wandb.init(project='U-Net', resume='allow', anonymous='must')
     experiment.config.update(
         dict(epochs=args.epochs, batch_size=args.batch_size, learning_rate=args.learning_rate,
-             val_percent=0.1, save_checkpoint=True, img_scale=args.scale, amp=False)
+             val_percent=0.1, save_checkpoint=True, img_scale=args.scale, amp=args.amp)
     )
 
     for epoch in range(1, args.epochs + 1):
@@ -171,17 +172,18 @@ if __name__ == '__main__':
             true_masks = torch.stack([tensor.sum(dim=0, keepdim=True) for tensor in masks], dim=0) \
                 .bool() \
                 .to(device=device, dtype=torch.long)
-            masks_pred = model(samples)
-            if model.n_classes == 1:
-                loss = criterion(masks_pred, true_masks.float())
-                loss += dice_loss(F.sigmoid(masks_pred.squeeze(1)), true_masks.float(), multiclass=False)
-            else:
-                loss = criterion(masks_pred, true_masks)
-                loss += dice_loss(
-                    F.softmax(masks_pred, dim=1).float(),
-                    F.one_hot(true_masks, model.n_classes).permute(0, 3, 1, 2).float(),
-                    multiclass=True
-                )
+            with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=args.amp):
+                masks_pred = model(samples)
+                if model.n_classes == 1:
+                    loss = criterion(masks_pred, true_masks.float())
+                    loss += dice_loss(F.sigmoid(masks_pred), true_masks.float(), multiclass=False)
+                else:
+                    loss = criterion(masks_pred, true_masks)
+                    loss += dice_loss(
+                        F.softmax(masks_pred, dim=1).float(),
+                        F.one_hot(true_masks, model.n_classes).permute(0, 3, 1, 2).float(),
+                        multiclass=True
+                    )
             if (len(data_loader_train) * args.batch_size) % (
                     (len(data_loader_train) * args.batch_size) // prin_freq) == 0:
                 print(f"loss:{loss}")
@@ -212,7 +214,7 @@ if __name__ == '__main__':
                 #     if not (torch.isinf(value.grad) | torch.isnan(value.grad)).any():
                 #         histograms['Gradients/' + tag] = wandb.Histogram(value.grad.data.cpu())
 
-                val_score = evaluate(model, data_loader_val, device, False)
+                val_score = evaluate(model, data_loader_val, device, args.amp)
                 scheduler.step(val_score)
 
                 logging.info('Validation Dice score: {}'.format(val_score))
