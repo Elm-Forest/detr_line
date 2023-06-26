@@ -75,8 +75,9 @@ def evaluate(net, dataloader, device, amp):
             masks = [t["masks"] for t in targets]
             mask_true = torch.stack([tensor.sum(dim=0, keepdim=True) for tensor in masks], dim=0) \
                 .bool() \
+                .squeeze_(1) \
                 .to(device=device, dtype=torch.long)
-            mask_pred = model(samples)
+            mask_pred = model(samples).squeeze(1)
             if model.n_classes == 1:
                 assert mask_true.min() >= 0 and mask_true.max() <= 1, 'True mask indices should be in [0, 1]'
                 mask_pred = (F.sigmoid(mask_pred) > 0.5).float()
@@ -106,6 +107,7 @@ def init(args):
     args.dilation = False
     args.epochs = 5
     args.amp = True
+    args.num_class = 1
     # args.batch_size = 1
     # args.lr = 1e-4
     # args.coco_path = 'D:\dataset\coco_powerline_1'
@@ -170,18 +172,20 @@ if __name__ == '__main__':
             # 处理coco实例分割掩码
             # 实例mask累加-->语义mask
             true_masks = torch.stack([tensor.sum(dim=0, keepdim=True) for tensor in masks], dim=0) \
-                .bool() \
+                .bool()\
+                .squeeze(1)\
                 .to(device=device, dtype=torch.long)
+            # 二分类 one-hot编码
+            # true_masks = F.one_hot(true_masks.squeeze_(1), 2).permute(0, 3, 1, 2).float()
             with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=args.amp):
-                masks_pred = model(samples)
+                masks_pred = model(samples).squeeze(1)
                 if model.n_classes == 1:
                     loss = criterion(masks_pred, true_masks.float())
                     loss += dice_loss(F.sigmoid(masks_pred), true_masks.float(), multiclass=False)
                 else:
                     loss = criterion(masks_pred, true_masks)
                     loss += dice_loss(
-                        F.softmax(masks_pred, dim=1).float(),
-                        F.one_hot(true_masks, model.n_classes).permute(0, 3, 1, 2).float(),
+                        F.softmax(masks_pred, dim=1).float(), true_masks,
                         multiclass=True
                     )
             if (len(data_loader_train) * args.batch_size) % (
