@@ -172,11 +172,12 @@ if __name__ == '__main__':
             # 处理coco实例分割掩码
             # 实例mask累加-->语义mask
             true_masks = torch.stack([tensor.sum(dim=0, keepdim=True) for tensor in masks], dim=0) \
-                .bool()\
-                .squeeze(1)\
+                .bool() \
+                .squeeze(1) \
                 .to(device=device, dtype=torch.long)
             # 二分类 one-hot编码
             # true_masks = F.one_hot(true_masks.squeeze_(1), 2).permute(0, 3, 1, 2).float()
+            global_step += 1
             with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=args.amp):
                 masks_pred = model(samples).squeeze(1)
                 if model.n_classes == 1:
@@ -188,7 +189,7 @@ if __name__ == '__main__':
                         F.softmax(masks_pred, dim=1).float(), true_masks,
                         multiclass=True
                     )
-            if (len(data_loader_train) * args.batch_size) % (
+            if global_step % (
                     (len(data_loader_train) * args.batch_size) // prin_freq) == 0:
                 print(f"loss:{loss}")
             optimizer.zero_grad(set_to_none=True)
@@ -197,7 +198,6 @@ if __name__ == '__main__':
             grad_scaler.step(optimizer)
             grad_scaler.update()
 
-            global_step += 1
             epoch_loss += loss.item()
 
             experiment.log({
