@@ -75,9 +75,8 @@ def evaluate(net, dataloader, device, amp):
             masks = [t["masks"] for t in targets]
             mask_true = torch.stack([tensor.sum(dim=0, keepdim=True) for tensor in masks], dim=0) \
                 .bool() \
-                .squeeze(1) \
                 .to(device=device, dtype=torch.long)
-            mask_pred = model(samples).squeeze(1)
+            mask_pred = model(samples)
             if model.n_classes == 1:
                 assert mask_true.min() >= 0 and mask_true.max() <= 1, 'True mask indices should be in [0, 1]'
                 mask_pred = (F.sigmoid(mask_pred) > 0.5).float()
@@ -162,7 +161,7 @@ if __name__ == '__main__':
     for epoch in range(1, args.epochs + 1):
         model.train()
         epoch_loss = 0
-
+        prin_freq = 10
         for samples, targets in data_loader_train:
             samples = samples.tensors.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
             targets = [{k: v for k, v in t.items()} for t in targets]
@@ -171,9 +170,8 @@ if __name__ == '__main__':
             # 实例mask累加-->语义mask
             true_masks = torch.stack([tensor.sum(dim=0, keepdim=True) for tensor in masks], dim=0) \
                 .bool() \
-                .squeeze(1) \
                 .to(device=device, dtype=torch.long)
-            masks_pred = model(samples).squeeze(1)
+            masks_pred = model(samples)
             if model.n_classes == 1:
                 loss = criterion(masks_pred, true_masks.float())
                 loss += dice_loss(F.sigmoid(masks_pred.squeeze(1)), true_masks.float(), multiclass=False)
@@ -184,7 +182,9 @@ if __name__ == '__main__':
                     F.one_hot(true_masks, model.n_classes).permute(0, 3, 1, 2).float(),
                     multiclass=True
                 )
-
+            if (len(data_loader_train) * args.batch_size) % (
+                    (len(data_loader_train) * args.batch_size) // prin_freq) == 0:
+                print(f"loss:{loss}")
             optimizer.zero_grad(set_to_none=True)
             grad_scaler.scale(loss).backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -201,7 +201,7 @@ if __name__ == '__main__':
             })
 
             # Evaluation round
-            division_step = 3
+            division_step = len(data_loader_train) * args.batch_size
 
             if global_step % division_step == 0:
                 histograms = {}
