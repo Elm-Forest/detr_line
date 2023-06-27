@@ -182,7 +182,10 @@ if __name__ == '__main__':
                 masks_pred = model(samples).squeeze(1)
                 if model.n_classes == 1:
                     loss = criterion(masks_pred, true_masks.float())
-                    loss += dice_loss(F.sigmoid(masks_pred), true_masks.float(), multiclass=False)
+                    print('bce:', loss)
+                    loss += dice_loss(masks_pred, true_masks.float(), multiclass=False)
+                    print('all:', loss)
+                    # loss += dice_loss(F.sigmoid(masks_pred), true_masks.float(), multiclass=False)
                 else:
                     loss = criterion(masks_pred, true_masks)
                     loss += dice_loss(
