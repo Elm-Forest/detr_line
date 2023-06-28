@@ -115,9 +115,7 @@ class HT(nn.Module):
 
     def forward(self, image):
         batch, channel, _, _ = image.size()
-        print(image.shape)
         image = image.view(batch, channel, -1).view(batch * channel, -1)
-        print(image.shape)
         image = F.relu(image)
         HT_map = image @ self.vote_index
         ### normalization ###
