@@ -23,7 +23,7 @@ class Transformer(nn.Module):
     def __init__(self, d_model=512, nhead=8, num_encoder_layers=6,
                  num_decoder_layers=6, dim_feedforward=2048, dropout=0.1,
                  activation="relu", normalize_before=False,
-                 return_intermediate_dec=False):
+                 return_intermediate_dec=False, ht=None):
         super().__init__()
 
         encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward,
@@ -33,7 +33,7 @@ class Transformer(nn.Module):
         decoder_first_layer = TransformerDecoderFirstLayer(d_model, nhead, dim_feedforward,
                                                            dropout, activation, normalize_before)
         decoder_layer = TransformerDecoderLayer(d_model, nhead, dim_feedforward,
-                                                dropout, activation, normalize_before)
+                                                dropout, activation, normalize_before, ht)
         decoder_last_layer = TransformerDecoderLastLayer(d_model, nhead, dim_feedforward,
                                                          dropout, activation, normalize_before)
         decoder_norm = nn.LayerNorm(d_model)
@@ -52,7 +52,7 @@ class Transformer(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, src, mask, query_embed, pos_embed, HT):
+    def forward(self, src, mask, query_embed, pos_embed):
         # flatten NxCxHxW to HWxNxC
         bs, c, h, w = src.shape
         src = src.flatten(2).permute(2, 0, 1)
@@ -64,8 +64,7 @@ class Transformer(nn.Module):
         attn_begin = torch.zeros((bs * self.nhead, query_embed.size(0), h * w)).to(tgt.device)
         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
         hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
-                          pos=pos_embed, query_pos=query_embed,
-                          HT=HT, height=h, weight=w, attn_begin=attn_begin)
+                          pos=pos_embed, query_pos=query_embed, height=h, weight=w, attn_begin=attn_begin)
         return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
 
 
@@ -119,8 +118,7 @@ class TransformerDecoder(nn.Module):
                 tgt_key_padding_mask: Optional[Tensor] = None,
                 memory_key_padding_mask: Optional[Tensor] = None,
                 pos: Optional[Tensor] = None,
-                query_pos: Optional[Tensor] = None,
-                HT=None, height=None, weight=None, attn_begin=None):
+                query_pos: Optional[Tensor] = None, height=None, weight=None, attn_begin=None):
         output = tgt
         attn_output_weights = attn_begin
         intermediate = []
@@ -136,7 +134,7 @@ class TransformerDecoder(nn.Module):
                                                 memory_mask=memory_mask,
                                                 tgt_key_padding_mask=tgt_key_padding_mask,
                                                 memory_key_padding_mask=memory_key_padding_mask,
-                                                pos=pos, query_pos=query_pos, HT=HT, height=height, weight=weight,
+                                                pos=pos, query_pos=query_pos, height=height, weight=weight,
                                                 attn_w_before=attn_output_weights)
             if self.return_intermediate:
                 intermediate.append(self.norm(output))
@@ -224,7 +222,7 @@ class TransformerEncoderLayer(nn.Module):
 class TransformerDecoderLayer(nn.Module):
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
-                 activation="relu", normalize_before=False):
+                 activation="relu", normalize_before=False, ht=None):
         super().__init__()
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         self.multihead_attn = HoughAttention(d_model, nhead, dropout=dropout)
@@ -232,6 +230,7 @@ class TransformerDecoderLayer(nn.Module):
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)
         self.linear2 = nn.Linear(dim_feedforward, d_model)
+        self.ht = ht
 
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
@@ -253,7 +252,7 @@ class TransformerDecoderLayer(nn.Module):
                      memory_key_padding_mask: Optional[Tensor] = None,
                      pos: Optional[Tensor] = None,
                      query_pos: Optional[Tensor] = None,
-                     height=None, weight=None, HT=None, attn_w_before=None):
+                     height=None, weight=None, attn_w_before=None):
         q = k = self.with_pos_embed(tgt, query_pos)
         tgt2 = self.self_attn(q, k, value=tgt, attn_mask=tgt_mask,
                               key_padding_mask=tgt_key_padding_mask)[0]
@@ -263,7 +262,7 @@ class TransformerDecoderLayer(nn.Module):
                                                      key=self.with_pos_embed(memory, pos),
                                                      value=memory, attn_mask=memory_mask,
                                                      key_padding_mask=memory_key_padding_mask,
-                                                     height=height, weight=weight, HT=HT,
+                                                     height=height, weight=weight, HT=self.ht,
                                                      attn_w_before=attn_w_before)
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
@@ -279,7 +278,7 @@ class TransformerDecoderLayer(nn.Module):
                     memory_key_padding_mask: Optional[Tensor] = None,
                     pos: Optional[Tensor] = None,
                     query_pos: Optional[Tensor] = None,
-                    height=None, weight=None, HT=None, attn_w_before=None):
+                    height=None, weight=None, attn_w_before=None):
         tgt2 = self.norm1(tgt)
         q = k = self.with_pos_embed(tgt2, query_pos)
         tgt2 = self.multihead_attn(q, k, value=tgt2, attn_mask=tgt_mask,
@@ -290,7 +289,7 @@ class TransformerDecoderLayer(nn.Module):
                                                  key=self.with_pos_embed(memory, pos),
                                                  value=memory, attn_mask=memory_mask,
                                                  key_padding_mask=memory_key_padding_mask,
-                                                 height=height, weight=weight, HT=HT, attn_w_before=attn_w_before)
+                                                 height=height, weight=weight, HT=self.ht, attn_w_before=attn_w_before)
         tgt = tgt + self.dropout2(tgt2)
         tgt2 = self.norm3(tgt)
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt2))))
@@ -304,14 +303,14 @@ class TransformerDecoderLayer(nn.Module):
                 memory_key_padding_mask: Optional[Tensor] = None,
                 pos: Optional[Tensor] = None,
                 query_pos: Optional[Tensor] = None,
-                height=None, weight=None, HT=None, attn_w_before=None):
+                height=None, weight=None, attn_w_before=None):
         if self.normalize_before:
             return self.forward_pre(tgt, memory, tgt_mask, memory_mask,
                                     tgt_key_padding_mask, memory_key_padding_mask, pos, query_pos, height=height,
-                                    weight=weight, HT=HT, attn_w_before=attn_w_before)
+                                    weight=weight, attn_w_before=attn_w_before)
         return self.forward_post(tgt, memory, tgt_mask, memory_mask,
                                  tgt_key_padding_mask, memory_key_padding_mask, pos, query_pos,
-                                 height=height, weight=weight, HT=HT, attn_w_before=attn_w_before)
+                                 height=height, weight=weight, attn_w_before=attn_w_before)
 
 
 class TransformerDecoderFirstLayer(nn.Module):
@@ -488,7 +487,7 @@ def _get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
 
 
-def build_transformer(args):
+def build_transformer(args, cat_htiht):
     return Transformer(
         d_model=args.hidden_dim,
         dropout=args.dropout,
@@ -498,6 +497,7 @@ def build_transformer(args):
         num_decoder_layers=args.dec_layers,
         normalize_before=args.pre_norm,
         return_intermediate_dec=True,
+        ht=cat_htiht
     )
 
 

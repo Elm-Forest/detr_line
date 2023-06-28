@@ -22,7 +22,7 @@ from .transformer import build_transformer
 class DETR(nn.Module):
     """ This is the DETR module that performs object detection """
 
-    def __init__(self, backbone, transformer, num_classes, num_queries, cat_htiht, aux_loss=False):
+    def __init__(self, backbone, transformer, num_classes, num_queries, aux_loss=False):
         """ Initializes the model.
         Parameters:
             backbone: torch module of the backbone to be used. See backbone.py
@@ -42,7 +42,6 @@ class DETR(nn.Module):
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.backbone = backbone
         self.aux_loss = aux_loss
-        self.cat_htiht = cat_htiht
 
     def forward(self, samples: NestedTensor):
         """ The forward expects a NestedTensor, which consists of:
@@ -65,7 +64,7 @@ class DETR(nn.Module):
 
         src, mask = features[-1].decompose()
         assert mask is not None
-        hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1], HT=self.cat_htiht)[0]
+        hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0]
 
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
@@ -376,15 +375,14 @@ def build(args, data_loader):
                                 device=device,
                                 inplanes=args.num_queries,
                                 outplanes=args.num_queries)
-    transformer = build_transformer(args)
+    transformer = build_transformer(args, cat_htiht)
 
     model = DETR(
         backbone,
         transformer,
         num_classes=num_classes,
         num_queries=args.num_queries,
-        aux_loss=args.aux_loss,
-        cat_htiht=cat_htiht
+        aux_loss=args.aux_loss
     )
     if args.transfer:
         print('Transfer Learning Mode~~')
