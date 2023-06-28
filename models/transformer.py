@@ -61,7 +61,8 @@ class Transformer(nn.Module):
         mask = mask.flatten(1)
 
         tgt = torch.zeros_like(query_embed)
-        attn_begin = torch.zeros((bs * self.nhead, query_embed.size(0), h * w)).to(tgt.device)
+        # attn_begin = torch.zeros((bs * self.nhead, query_embed.size(0), h * w)).to(tgt.device)
+        attn_begin = None
         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
         hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
                           pos=pos_embed, query_pos=query_embed, height=h, weight=w, attn_begin=attn_begin)

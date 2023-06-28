@@ -3,7 +3,6 @@
 DETR model and criterion classes.
 """
 import torch
-import torch.nn.functional as F
 from torch import nn
 
 from util import box_ops
@@ -40,6 +39,7 @@ class DETR(nn.Module):
         self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
+        self.fpn = FPN([256, 512, 1024, 2048], 2048)
         self.backbone = backbone
         self.aux_loss = aux_loss
 
@@ -61,7 +61,9 @@ class DETR(nn.Module):
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
         features, pos = self.backbone(samples)
-
+        p1, p2, p3, p4 = features[0].tensors, features[1].tensors, features[2].tensors, features[3].tensors
+        scale_feat = self.fpn([p1, p2, p3, p4])
+        print(scale_feat.shape)
         src, mask = features[-1].decompose()
         assert mask is not None
         hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0]
@@ -80,6 +82,42 @@ class DETR(nn.Module):
         # as a dict having both a Tensor and a list.
         return [{'pred_logits': a, 'pred_boxes': b}
                 for a, b in zip(outputs_class[:-1], outputs_coord[:-1])]
+
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class FPN(nn.Module):
+    def __init__(self, in_channels_list, out_channels):
+        super(FPN, self).__init__()
+        self.inner_blocks = nn.ModuleList()
+        self.layer_blocks = nn.ModuleList()
+        for in_channels in in_channels_list:
+            if in_channels is not None:
+                inner_block_module = nn.Conv2d(in_channels, out_channels, 1)
+                layer_block_module = nn.Conv2d(out_channels, out_channels, 3, padding=1)
+                self.inner_blocks.append(inner_block_module)
+                self.layer_blocks.append(layer_block_module)
+            else:
+                self.inner_blocks.append(None)
+                self.layer_blocks.append(None)
+
+    def forward(self, inputs):
+        inputs = list(inputs)
+        inner_top_down = self.inner_blocks[-1](inputs[-1])
+        results = []
+        results.append(self.layer_blocks[-1](inner_top_down))
+        for feature, inner_block, layer_block in zip(
+                inputs[:-1][::-1], self.inner_blocks[:-1][::-1], self.layer_blocks[:-1][::-1]
+        ):
+            if inner_block is not None:
+                inner_lateral = inner_block(feature)
+                inner_top_down = F.interpolate(inner_top_down, size=inner_lateral.shape[-2:], mode="nearest")
+                inner_top_down = inner_lateral + inner_top_down
+                results.insert(0, layer_block(inner_top_down))
+        return tuple(results)
 
 
 class SetCriterion(nn.Module):
