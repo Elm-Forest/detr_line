@@ -37,9 +37,9 @@ class Transformer(nn.Module):
         decoder_last_layer = TransformerDecoderLastLayer(d_model, nhead, dim_feedforward,
                                                          dropout, activation, normalize_before)
         decoder_norm = nn.LayerNorm(d_model)
-        assert num_decoder_layers - 2 > 0, 'num_decoder_layers should > 2'
+        assert num_decoder_layers - 1 > 0, 'num_decoder_layers should > 2'
         self.decoder = TransformerDecoder(decoder_first_layer, decoder_layer, decoder_last_layer,
-                                          num_decoder_layers - 2,
+                                          num_decoder_layers - 1,
                                           decoder_norm,
                                           return_intermediate=return_intermediate_dec)
 
@@ -98,7 +98,8 @@ def _get_clones(module, N):
 
 
 def _construct_decoder_layer(first, module, last, N):
-    layers = [copy.deepcopy(first)] + [copy.deepcopy(module) for i in range(N)] + [copy.deepcopy(last)]
+    # layers = [copy.deepcopy(first)] + [copy.deepcopy(module) for i in range(N)] + [copy.deepcopy(last)]
+    layers = [copy.deepcopy(first)] + [copy.deepcopy(module) for _ in range(N)]
     return nn.ModuleList(layers)
 
 
@@ -130,7 +131,7 @@ class TransformerDecoder(nn.Module):
                                                      pos=pos, query_pos=query_pos)
         if self.return_intermediate:
             intermediate.append(self.norm(output))
-        for layer in self.layers[1:-1]:
+        for layer in self.layers[1:]:
             output, attn_output_weights = layer(output, memory, tgt_mask=tgt_mask,
                                                 memory_mask=memory_mask,
                                                 tgt_key_padding_mask=tgt_key_padding_mask,
@@ -139,14 +140,14 @@ class TransformerDecoder(nn.Module):
                                                 attn_w_before=attn_output_weights)
             if self.return_intermediate:
                 intermediate.append(self.norm(output))
-
-        output = self.layers[-1](output, memory, tgt_mask=tgt_mask,
-                                 memory_mask=memory_mask,
-                                 tgt_key_padding_mask=tgt_key_padding_mask,
-                                 memory_key_padding_mask=memory_key_padding_mask,
-                                 pos=pos, query_pos=query_pos)
-        if self.return_intermediate:
-            intermediate.append(self.norm(output))
+        #
+        # output = self.layers[-1](output, memory, tgt_mask=tgt_mask,
+        #                          memory_mask=memory_mask,
+        #                          tgt_key_padding_mask=tgt_key_padding_mask,
+        #                          memory_key_padding_mask=memory_key_padding_mask,
+        #                          pos=pos, query_pos=query_pos)
+        # if self.return_intermediate:
+        #     intermediate.append(self.norm(output))
 
         if self.norm is not None:
             output = self.norm(output)

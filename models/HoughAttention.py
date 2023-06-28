@@ -354,7 +354,7 @@ def _scaled_dot_product_attention(
     # ht: hough transform - > hough map -> filter noise ->reverse hough transform -> enhance line feature
     attn_w_before = ht(attn_w_before)
     attn_w_before = attn_w_before.view(bc, qy, -1)
-    attn_w_before = softmax(attn_w_before, dim=-1)
+    # attn_w_before = softmax(attn_w_before, dim=-1)
     attn = attn * attn_w_before
     attn_content = relu(attn)
     # attn_w_before = softmax(attn_w_before, dim=-1)
@@ -366,7 +366,6 @@ def _scaled_dot_product_attention(
     # (B, Nt, Ns) x (B, Ns, E) -> (B, Nt, E)
     output = torch.bmm(attn, v)
     return output, attn, attn_content
-
 
 def _in_projection(
         q: Tensor,
