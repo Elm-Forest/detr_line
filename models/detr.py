@@ -39,7 +39,7 @@ class DETR(nn.Module):
         self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
-        self.fpn = FPN([256, 512, 1024, 2048], 2048)
+        # self.fpn = FPN([256, 512, 1024, 2048], 2048)
         self.backbone = backbone
         self.aux_loss = aux_loss
 
@@ -61,9 +61,9 @@ class DETR(nn.Module):
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
         features, pos = self.backbone(samples)
-        p1, p2, p3, p4 = features[0].tensors, features[1].tensors, features[2].tensors, features[3].tensors
-        scale_feat = self.fpn([p1, p2, p3, p4])
-        print(scale_feat.shape)
+        # p1, p2, p3, p4 = features[0].tensors, features[1].tensors, features[2].tensors, features[3].tensors
+        # scale_feat = self.fpn([p1, p2, p3, p4])
+        # print(scale_feat.shape)
         src, mask = features[-1].decompose()
         assert mask is not None
         hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0]
@@ -196,6 +196,19 @@ class SetCriterion(nn.Module):
 
         losses = {}
         losses['loss_bbox'] = loss_bbox.sum() / num_boxes
+        return losses
+
+    def loss_giou(self, outputs, targets, indices, num_boxes):
+        """Compute the losses related to the bounding boxes, the L1 regression loss and the GIoU loss
+           targets dicts must contain the key "boxes" containing a tensor of dim [nb_target_boxes, 4]
+           The target boxes are expected in format (center_x, center_y, w, h), normalized by the image size.
+        """
+        assert 'pred_boxes' in outputs
+        idx = self._get_src_permutation_idx(indices)
+        src_boxes = outputs['pred_boxes'][idx]
+        target_boxes = torch.cat([t['boxes'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+
+        losses = {}
 
         loss_giou = 1 - torch.diag(box_ops.generalized_box_iou(
             box_ops.box_cxcywh_to_xyxy(src_boxes),
@@ -276,6 +289,7 @@ class SetCriterion(nn.Module):
             'labels': self.loss_labels,
             'cardinality': self.loss_cardinality,
             'boxes': self.loss_boxes,
+            'giou': self.loss_giou,
             'masks': self.loss_masks,
             'lines': self.loss_angles,
             'ea': self.loss_ea
@@ -430,7 +444,6 @@ def build(args, data_loader):
     matcher = build_matcher(args)
     weight_dict = {'loss_ce': 1, 'loss_bbox': args.bbox_loss_coef}
     # weight_dict['loss_giou'] = args.giou_loss_coef
-    weight_dict['loss_giou'] = 0
     if args.line_loss:
         weight_dict['loss_angles'] = args.line_loss_coef
     if args.ea_loss:
@@ -446,6 +459,7 @@ def build(args, data_loader):
         weight_dict.update(aux_weight_dict)
 
     losses = ['labels', 'boxes', 'cardinality']
+    # losses += ['giou']
     if args.ea_loss:
         losses += ["ea"]
     if args.line_loss:

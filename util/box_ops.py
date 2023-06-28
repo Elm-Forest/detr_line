@@ -91,17 +91,15 @@ def masks_to_boxes(masks):
 
 
 def line_angle(x):
-    # x: [nb_target_boxes , 4]
-    # 4: (center_x, center_y, w, h)
-    h = x[:, 2]  # 获取每个 batch 的 h
-    w = x[:, 3]  # 获取每个 batch 的 w
+    # x: [num_target_boxes , (center_x, center_y, w, h)]
+    h = x[:, 2]
+    w = x[:, 3]
     unit_theta = 180 / math.pi
     return (torch.atan(h / w) * unit_theta).unsqueeze(dim=1)
 
 
 def line_distance(x, y, std_x, std_y):
-    # x: [nb_target_boxes , 4]
-    # 4: (center_x, center_y, w, h)
+    # x,y: [num_target_boxes , (center_x, center_y, w, h)]
     xx = x[:, 0] / std_x
     xy = x[:, 1] / std_y
     yx = y[:, 0] / std_x
