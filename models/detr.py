@@ -429,7 +429,8 @@ def build(args, data_loader):
         model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))
     matcher = build_matcher(args)
     weight_dict = {'loss_ce': 1, 'loss_bbox': args.bbox_loss_coef}
-    weight_dict['loss_giou'] = args.giou_loss_coef
+    # weight_dict['loss_giou'] = args.giou_loss_coef
+    weight_dict['loss_giou'] = 0
     if args.line_loss:
         weight_dict['loss_angles'] = args.line_loss_coef
     if args.ea_loss:
