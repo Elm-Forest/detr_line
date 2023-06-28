@@ -115,7 +115,9 @@ class HT(nn.Module):
 
     def forward(self, image):
         batch, channel, _, _ = image.size()
+        print(image.shape)
         image = image.view(batch, channel, -1).view(batch * channel, -1)
+        print(image.shape)
         image = F.relu(image)
         HT_map = image @ self.vote_index
         ### normalization ###
@@ -289,7 +291,12 @@ class CAT_HTIHT(nn.Module):
 def test():
     from matplotlib import pyplot as plt
     img = np.zeros((120, 100), dtype=np.uint8)
-    cv2.line(img, (0, 100), (100, 100), 255, 1)
+    # 绘制第一条弧线
+    cv2.ellipse(img, (50, 75), (30, 30), 0, 0, 180, 255, 1)
+
+    # 绘制第二条弧线
+    cv2.ellipse(img, (50, 50), (20, 40), 0, 0, 270, 255, 1)
+    cv2.line(img, (0, 100), (100, 100), 100, 1)
     cv2.line(img, (25, 75), (75, 50), 255, 1)
     cv2.line(img, (45, 50), (55, 50), 255, 1)
     # cv2.circle(img, (80, 80), 10, 200, -1)
@@ -303,11 +310,12 @@ def test():
     rows, cols = img.shape
     vote_index = hough_transform(rows, cols, theta_res=1, rho_res=1)
     vote_index2 = torch.from_numpy(vote_index).float().contiguous()
+    print(vote_index2.shape)
     img_t = torch.from_numpy(img).float().contiguous()
     img_t = img_t.unsqueeze(0).unsqueeze(0)
     HT_map = HT(vote_index2)(img_t)
     ht_g = HT_map.squeeze(0).squeeze(0)
-    print(HT_map.squeeze(0).squeeze(0).shape)
+    # print(HT_map.squeeze(0).squeeze(0).shape)
     plt.imshow(ht_g)
     plt.show()
     IHT_map = IHT(vote_index2)(HT_map)

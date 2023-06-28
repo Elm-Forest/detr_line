@@ -4,7 +4,7 @@ from typing import Optional, Tuple, List
 
 import torch
 from torch import Tensor
-from torch.nn.functional import linear, dropout, softmax
+from torch.nn.functional import linear, dropout, softmax, relu
 from torch.nn.init import constant_, xavier_normal_, xavier_uniform_
 from torch.nn.modules import Module
 from torch.nn.modules.linear import NonDynamicallyQuantizableLinear
@@ -310,8 +310,8 @@ def multi_head_attention_forward(
     #
     # (deep breath) calculate attention and out projection
     #
-    attn_output, attn_output_weights = _scaled_dot_product_attention(q, k, v, attn_mask, dropout_p)
-    attn_w_before = attn_output_weights.clone()
+    attn_output, attn_output_weights, attn_content = _scaled_dot_product_attention(q, k, v, attn_mask, dropout_p)
+    attn_w_before = attn_content.clone()
     attn_output = attn_output.transpose(0, 1).contiguous().view(tgt_len, bsz, embed_dim)
     attn_output = linear(attn_output, out_proj_weight, out_proj_bias)
 
@@ -329,7 +329,7 @@ def _scaled_dot_product_attention(
         v: Tensor,
         attn_mask: Optional[Tensor] = None,
         dropout_p: float = 0.0
-) -> Tuple[Tensor, Tensor]:
+) -> Tuple[Tensor, Tensor, Tensor]:
     B, Nt, E = q.shape
     q = q / math.sqrt(E)
     # (B, Nt, E) x (B, E, Ns) -> (B, Nt, Ns)
@@ -337,12 +337,13 @@ def _scaled_dot_product_attention(
 
     if attn_mask is not None:
         attn += attn_mask
+    attn_content = relu(attn)
     attn = softmax(attn, dim=-1)
     if dropout_p > 0.0:
         attn = dropout(attn, p=dropout_p)
     # (B, Nt, Ns) x (B, Ns, E) -> (B, Nt, E)
     output = torch.bmm(attn, v)
-    return output, attn
+    return output, attn, attn_content
 
 
 def _in_projection(

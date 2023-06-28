@@ -4,7 +4,7 @@ from typing import Optional, Tuple, List
 
 import torch
 from torch import Tensor
-from torch.nn.functional import linear, dropout, softmax
+from torch.nn.functional import linear, dropout, softmax, relu
 from torch.nn.init import constant_, xavier_normal_, xavier_uniform_
 from torch.nn.modules import Module
 from torch.nn.modules.linear import NonDynamicallyQuantizableLinear
@@ -348,12 +348,15 @@ def _scaled_dot_product_attention(
 
     if attn_mask is not None:
         attn += attn_mask
-
+    # attn_w_before: The attn_content of the previous layer
     bc, qy, _ = attn_w_before.shape
     attn_w_before = attn_w_before.view(bc, qy, height, weight)
+    # ht: hough transform - > hough map -> filter noise ->reverse hough transform -> enhance line feature
     attn_w_before = ht(attn_w_before)
-    # 　attn_w_before = attn_w_before.view(bc, qy, -1)
-    attn = attn_content = attn_w_before.view(bc, qy, -1) + attn
+    attn_w_before = attn_w_before.view(bc, qy, -1)
+    attn_w_before = softmax(attn_w_before, dim=-1)
+    attn = attn * attn_w_before
+    attn_content = relu(attn)
     # attn_w_before = softmax(attn_w_before, dim=-1)
     attn = softmax(attn, dim=-1)
     # attn = softmax(attn_w_before + attn, dim=-1)

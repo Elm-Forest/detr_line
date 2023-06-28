@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch import nn
 
-from models.fpn import FPN50, FPN18, FPN101, ResNext50_FPN
+from models.fpn.fpn import FPN18, FPN50, FPN101, ResNext50_FPN
 
 
 class Net(nn.Module):
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     net = Net(100, 100, 'resnet50')
     weight_path = 'D:/下载项的原始目录/chrome的下载项/dht_r50_fpn_sel-c9a29d40.pth'
     net.load_state_dict(torch.load(weight_path), strict=False)
-    image_path = '/0153.jpg'
+    image_path = 'D:\dataset/NKL/NKL/1.jpg'
     from PIL import Image
 
     img = Image.open(image_path)
@@ -54,5 +54,5 @@ if __name__ == '__main__':
     output = net(x)
     for out in output:
         print(out.size())
-        plt.imshow(out[0][155].detach().numpy())
+        plt.imshow(out[0][25].detach().numpy())
         plt.show()
