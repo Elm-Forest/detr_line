@@ -155,7 +155,7 @@ def main(args):
 
     model, criterion, postprocessors = build_model(args, data_loader_train)
     model.to(device)
-
+    device2 = torch.device('cpu')
     model_without_ddp = model
     if args.distributed:
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
@@ -230,7 +230,7 @@ def main(args):
                     'epoch': epoch,
                     'args': args,
                 }, checkpoint_path)
-        device2 = torch.device('cpu')
+
         model.to(device2)
         test_stats, coco_evaluator = evaluate(
             model, criterion, postprocessors, data_loader_val, base_ds, device2, args.output_dir
