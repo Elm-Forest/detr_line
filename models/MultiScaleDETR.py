@@ -80,7 +80,7 @@ class MultiScaleDETR(nn.Module):
         temp = nested_tensor_from_tensor_list(temp)
         p5_pos = self.backbone[1](temp)
         pos.pop(0)
-        pos += p5_pos
+        pos += [p5_pos]
         hs = self.transformer([p2, p3, p4, p5], [m2, m3, m4, m5], self.query_embed.weight, pos)[0]
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
