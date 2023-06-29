@@ -50,53 +50,53 @@ class MultiScaleFormer(nn.Module):
     def forward(self, src, mask, query_embed, pos_embed):
         # flatten NxCxHxW to HWxNxC
         bs, c, h, w = src[0].shape
+        src_ = src[0].flatten(2).permute(2, 0, 1)
+        pos_ = pos_embed[0].flatten(2).permute(2, 0, 1)
+        pos_key = pos_.clone()
+        mask_ = mask[0].flatten(1)
+        mask_key = mask_.clone()
+        memory1 = self.encoder_block1(value=src_,
+                                      query=src_,
+                                      src_key_padding_mask=mask_,
+                                      pos_key=pos_,
+                                      pos_query=pos_key)
 
-        src1 = src[0].flatten(2).permute(2, 0, 1)
-        pos1 = pos_embed[0].flatten(2).permute(2, 0, 1)
-        mask1 = mask[0].flatten(1)
+        src_ = src[1].flatten(2).permute(2, 0, 1)
+        pos_ = pos_embed[1].flatten(2).permute(2, 0, 1)
+        mask_ = mask[1].flatten(1)
 
-        memory1 = self.encoder_block1(value=src1,
-                                      query=src1,
-                                      src_key_padding_mask=mask1,
-                                      pos_key=pos1,
-                                      pos_query=pos1)
-
-        src2 = src[1].flatten(2).permute(2, 0, 1)
-        pos2 = pos_embed[1].flatten(2).permute(2, 0, 1)
-        mask2 = mask[1].flatten(1)
-
-        memory2 = self.encoder_block2(value=src2,
+        memory2 = self.encoder_block2(value=src_,
                                       query=memory1,
-                                      src_key_padding_mask=mask2,
-                                      pos_key=pos2,
-                                      pos_query=pos1)
+                                      src_key_padding_mask=mask_,
+                                      pos_key=pos_,
+                                      pos_query=pos_key)
 
-        src3 = src[2].flatten(2).permute(2, 0, 1)
-        pos3 = pos_embed[2].flatten(2).permute(2, 0, 1)
-        mask3 = mask[2].flatten(1)
+        src_ = src[2].flatten(2).permute(2, 0, 1)
+        pos_ = pos_embed[2].flatten(2).permute(2, 0, 1)
+        mask_ = mask[2].flatten(1)
 
-        memory3 = self.encoder_block3(value=src3,
+        memory3 = self.encoder_block3(value=src_,
                                       query=memory2,
-                                      src_key_padding_mask=mask3,
-                                      pos_key=pos3,
-                                      pos_query=pos1)
+                                      src_key_padding_mask=mask_,
+                                      pos_key=pos_,
+                                      pos_query=pos_key)
 
-        src4 = src[3].flatten(2).permute(2, 0, 1)
-        pos4 = pos_embed[3].flatten(2).permute(2, 0, 1)
-        mask4 = mask[3].flatten(1)
+        src_ = src[3].flatten(2).permute(2, 0, 1)
+        pos_ = pos_embed[3].flatten(2).permute(2, 0, 1)
+        mask_ = mask[3].flatten(1)
 
-        memory4 = self.encoder_block4(value=src4,
+        memory4 = self.encoder_block4(value=src_,
                                       query=memory3,
-                                      src_key_padding_mask=mask4,
-                                      pos_key=pos4,
-                                      pos_query=pos1)
+                                      src_key_padding_mask=mask_,
+                                      pos_key=pos_,
+                                      pos_query=pos_key)
 
         # src = src.flatten(2).permute(2, 0, 1)
         query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
         tgt = torch.zeros_like(query_embed)
         hs = self.decoder(tgt, [memory1, memory2, memory3, memory4],
-                          memory_key_padding_mask=mask1,
-                          pos=pos1,
+                          memory_key_padding_mask=mask_key,
+                          pos=pos_key,
                           query_pos=query_embed)
 
         return hs.transpose(1, 2), memory4.permute(1, 2, 0).view(bs, c, h, w)

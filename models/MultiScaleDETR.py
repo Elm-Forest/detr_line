@@ -69,7 +69,7 @@ class MultiScaleDETR(nn.Module):
         p2, m2 = features[1].decompose()
         p3, m3 = features[2].decompose()
         p4, m4 = features[3].decompose()
-        p5, _ = features[3].decompose()
+        p5, temp = features[3].decompose()
         p2 = self.input_proj2(p2)
         p3 = self.input_proj3(p3)
         p4 = self.input_proj4(p4)
@@ -78,9 +78,8 @@ class MultiScaleDETR(nn.Module):
         m5 = torch.zeros((b, h, w), dtype=torch.bool).to(p5.device)
         temp = torch.zeros((b, c, h, w)).to(p5.device)
         temp = nested_tensor_from_tensor_list(temp)
-        p5_pos = self.backbone[1](temp)
+        pos += [self.backbone[1](temp)]
         pos.pop(0)
-        pos += [p5_pos]
         hs = self.transformer([p2, p3, p4, p5], [m2, m3, m4, m5], self.query_embed.weight, pos)[0]
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
