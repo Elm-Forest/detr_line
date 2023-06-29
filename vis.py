@@ -4,7 +4,7 @@ from pycocotools.coco import COCO
 from skimage import io
 matplotlib.use('TkAgg')
 
-train_json = 'D:/dataset/coco_powerline_1/annotations/train.json'
+train_json = 'D:/dataset/coco_powerline_1/annotations/new/train.json'
 train_path = 'D:/dataset/coco_powerline_1/train/'
 
 
@@ -19,7 +19,7 @@ def visualization_seg(num_image, json_path):
 
     annIds = coco.getAnnIds(imgIds=img['id'], catIds=catIds, iscrowd=None)
     anns = coco.loadAnns(annIds)
-
+    print(anns)
     # 读取在线图片的方法
     # I = io.imread(img['coco_url'])
 
@@ -29,4 +29,4 @@ def visualization_seg(num_image, json_path):
 
 
 if __name__ == "__main__":
-    visualization_seg(136, train_json)
+    visualization_seg(855, train_json)

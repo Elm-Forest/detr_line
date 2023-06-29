@@ -282,13 +282,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.hidden_dim = 256
     args.masks = True
-    args.backbone = 'resnet34'
+    args.backbone = 'resnet50'
     backbone = build_backbone(args)
-    backbone[0].body.maxpool = backbone[0].body.relu
-    model = TransUNet(backbone,
-                      num_classes=1,
-                      in_channels=512,
-                      d_model=args.hidden_dim)
-    image = torch.randn(8, 3, 800, 800)
-    output = model(image)
-    print(output.shape)
+    ten = torch.rand(1, 3, 512, 512)
+    if isinstance(ten, (list, torch.Tensor)):
+        samples = nested_tensor_from_tensor_list(ten)
+    features, pos = backbone(samples)
+    # backbone[0].body.maxpool = backbone[0].body.relu
+    # model = TransUNet(backbone,
+    #                   num_classes=1,
+    #                   in_channels=512,
+    #                   d_model=args.hidden_dim)
+    # image = torch.randn(8, 3, 800, 800)
+    # output = model(image)
+    # print(output.shape)

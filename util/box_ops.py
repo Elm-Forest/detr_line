@@ -113,7 +113,9 @@ def ea_score(src_boxes, target_boxes, sample):
     loss_angle = torch.nn.functional.smooth_l1_loss(ax, ay, reduction='none')
     _, _, std_h, std_w = sample.shape
     loss_distance = line_distance(src_boxes, target_boxes, std_h, std_w)
+    # 角度相似度
     s_theta = 1 - loss_angle / 90
+    # 距离相似度
     s_distance = 1 - loss_distance
     s = torch.square(s_theta * s_distance)
     return s
