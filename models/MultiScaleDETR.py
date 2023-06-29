@@ -76,7 +76,7 @@ class MultiScaleDETR(nn.Module):
         p5 = self.input_proj5(p5)
         b, c, h, w = p5.shape
         m5 = torch.zeros((b, h, w), dtype=torch.bool).to(p5.device)
-        p5_pos = self.backbone[1](torch.zeros((b, c, h, w).to(p5.device)))
+        p5_pos = self.backbone[1](torch.zeros((b, c, h, w)).to(p5.device))
         pos.pop(0)
         pos += p5_pos
         hs = self.transformer([p2, p3, p4, p5], [m2, m3, m4, m5], self.query_embed.weight, pos)[0]
