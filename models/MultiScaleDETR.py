@@ -39,7 +39,7 @@ class MultiScaleDETR(nn.Module):
         self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
         self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
-
+        print(backbone.num_channels)
         self.input_proj5 = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=3, stride=2)
         self.input_proj4 = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.input_proj3 = nn.Conv2d(backbone.num_channels // 2, hidden_dim, kernel_size=1)

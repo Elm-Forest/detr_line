@@ -135,7 +135,7 @@ def make_coco_transforms(image_set):
         # ])
         return T.Compose([
             T.RandomHorizontalFlip(),
-            T.RandomResize([300]),  # 将RandomResize的尺度参数设置为[800]
+            T.RandomResize([512]),  # 将RandomResize的尺度参数设置为[800]
             normalize,
         ])
 
