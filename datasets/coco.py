@@ -138,19 +138,11 @@ def make_coco_transforms(image_set):
     #         T.RandomResize([512]),  # 将RandomResize的尺度参数设置为[800]
     #         normalize,
     #     ])
-    scales = [480, 512, 544]
 
     if image_set == 'train':
         return T.Compose([
             T.RandomHorizontalFlip(),
-            T.RandomSelect(
-                T.RandomResize(scales, max_size=1333),
-                T.Compose([
-                    T.RandomResize([400, 500, 550]),
-                    T.RandomSizeCrop(384, 600),
-                    T.RandomResize(scales, max_size=1333),
-                ])
-            ),
+            T.RandomResize(512, max_size=1333),
             normalize,
         ])
     if image_set == 'val':
@@ -191,11 +183,11 @@ def build_powerline(image_set, args):
 
 def build_powerline_set(image_set, args):
     root = Path(args.coco_path)
-    root2="D:/dataset/coco_powerline_1"
+    root2 = "D:/dataset/coco_powerline_1"
     assert root.exists(), f'provided COCO path {root} does not exist'
     PATHS = {
         "train": (root / "images", root / "annotations" / 'train.json'),
-        "val": (root2+"/train", root2+"/annotations"+'/val.json'),
+        "val": (root2 + "/train", root2 + "/annotations" + '/val.json'),
     }
 
     img_folder, ann_file = PATHS[image_set]
