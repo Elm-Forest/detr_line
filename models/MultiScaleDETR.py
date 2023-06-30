@@ -39,11 +39,11 @@ class MultiScaleDETR(nn.Module):
         self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
         self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
-        self.input_proj5 = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=3, stride=2)
+        # self.input_proj5 = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=3, stride=2)
         self.input_proj4 = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.input_proj3 = nn.Conv2d(backbone.num_channels // 2, hidden_dim, kernel_size=1)
         self.input_proj2 = nn.Conv2d(backbone.num_channels // 4, hidden_dim, kernel_size=1)
-
+        self.input_proj1 = nn.Conv2d(backbone.num_channels // 8, hidden_dim, kernel_size=1)
         # self.fpn = FPN([256, 512, 1024, 2048], 2048)
         self.backbone = backbone
         self.aux_loss = aux_loss
@@ -66,21 +66,24 @@ class MultiScaleDETR(nn.Module):
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
         features, pos = self.backbone(samples)
+        p1, m1 = features[0].decompose()
         p2, m2 = features[1].decompose()
         p3, m3 = features[2].decompose()
         p4, m4 = features[3].decompose()
-        p5, temp = features[3].decompose()
+        # p5, temp = features[3].decompose()
+        p1 = self.input_proj2(p1)
         p2 = self.input_proj2(p2)
         p3 = self.input_proj3(p3)
         p4 = self.input_proj4(p4)
-        p5 = self.input_proj5(p5)
-        b, c, h, w = p5.shape
-        m5 = torch.zeros((b, h, w), dtype=torch.bool).to(p5.device)
-        temp = torch.zeros((b, c, h, w)).to(p5.device)
-        temp = nested_tensor_from_tensor_list(temp)
-        pos += [self.backbone[1](temp)]
-        pos.pop(0)
-        hs = self.transformer([p2, p3, p4, p5], [m2, m3, m4, m5], self.query_embed.weight, pos)[0]
+        # p5 = self.input_proj5(p5)
+        # b, c, h, w = p5.shape
+        # m5 = torch.zeros((b, h, w), dtype=torch.bool).to(p5.device)
+        # temp = torch.zeros((b, c, h, w)).to(p5.device)
+        # temp = nested_tensor_from_tensor_list(temp)
+        # pos += [self.backbone[1](temp)]
+        # pos.pop(0)
+        pos = pos[::-1]
+        hs = self.transformer([p4, p3, p2, p1], [m4, m3, m2, m1], self.query_embed.weight, pos)[0]
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
         out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}

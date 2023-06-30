@@ -361,48 +361,48 @@ def _get_activation_fn(activation):
 if __name__ == '__main__':
     multiscaleformer = MultiScaleFormer()
     #
-    # x1 = torch.rand(1, 256, 64, 64)
-    # query = x1.flatten(2).permute(2, 0, 1)
-    # x2 = torch.rand(1, 256, 64, 64)
-    # value = x2.flatten(2).permute(2, 0, 1)
-    # query = multiscaleformer.encoder_block1(value=value,
-    #                                         query=query,
-    #                                         src_key_padding_mask=None,
-    #                                         pos_key=value,
-    #                                         pos_query=query)
-    # print(query.shape)
-    # x2 = torch.rand(1, 256, 32, 32)
-    # value = x2.flatten(2).permute(2, 0, 1)
-    # query = multiscaleformer.encoder_block1(value=value,
-    #                                         query=query,
-    #                                         src_key_padding_mask=None,
-    #                                         pos_key=value,
-    #                                         pos_query=query)
-    # print(query.shape)
-    # x2 = torch.rand(1, 256, 16, 16)
-    # value = x2.flatten(2).permute(2, 0, 1)
-    # query = multiscaleformer.encoder_block1(value=value,
-    #                                         query=query,
-    #                                         src_key_padding_mask=None,
-    #                                         pos_key=value,
-    #                                         pos_query=query)
-    # print(query.shape)
-    # x2 = torch.rand(1, 256, 8, 8)
-    # value = x2.flatten(2).permute(2, 0, 1)
-    # query = multiscaleformer.encoder_block1(value=value,
-    #                                         query=query,
-    #                                         src_key_padding_mask=None,
-    #                                         pos_key=value,
-    #                                         pos_query=query)
-    # print(query.shape)
-
-    x1 = torch.rand(1, 256, 64, 64)
-    m1 = torch.rand(1, 64, 64)
+    x1 = torch.rand(1, 256, 16, 16)
+    query = x1.flatten(2).permute(2, 0, 1)
+    x2 = torch.rand(1, 256, 16, 16)
+    value = x2.flatten(2).permute(2, 0, 1)
+    query = multiscaleformer.encoder_block1(value=value,
+                                            query=query,
+                                            src_key_padding_mask=None,
+                                            pos_key=value,
+                                            pos_query=query)
+    print(query.shape)
     x2 = torch.rand(1, 256, 32, 32)
-    m2 = torch.rand(1, 32, 32)
-    x3 = torch.rand(1, 256, 16, 16)
-    m3 = torch.rand(1, 16, 16)
-    x4 = torch.rand(1, 256, 8, 8)
-    m4 = torch.rand(1, 8, 8)
-    out = multiscaleformer([x1, x2, x3, x4], [m1, m2, m3, m4], nn.Embedding(10, 256).weight, [x1, x2, x3, x4])[0]
-    print(out.shape)
+    value = x2.flatten(2).permute(2, 0, 1)
+    query = multiscaleformer.encoder_block1(value=value,
+                                            query=query,
+                                            src_key_padding_mask=None,
+                                            pos_key=value,
+                                            pos_query=query)
+    print(query.shape)
+    x2 = torch.rand(1, 256, 64, 64)
+    value = x2.flatten(2).permute(2, 0, 1)
+    query = multiscaleformer.encoder_block1(value=value,
+                                            query=query,
+                                            src_key_padding_mask=None,
+                                            pos_key=value,
+                                            pos_query=query)
+    print(query.shape)
+    x2 = torch.rand(1, 256, 128, 128)
+    value = x2.flatten(2).permute(2, 0, 1)
+    query = multiscaleformer.encoder_block1(value=value,
+                                            query=query,
+                                            src_key_padding_mask=None,
+                                            pos_key=value,
+                                            pos_query=query)
+    print(query.shape)
+
+    # x1 = torch.rand(1, 256, 64, 64)
+    # m1 = torch.rand(1, 64, 64)
+    # x2 = torch.rand(1, 256, 32, 32)
+    # m2 = torch.rand(1, 32, 32)
+    # x3 = torch.rand(1, 256, 16, 16)
+    # m3 = torch.rand(1, 16, 16)
+    # x4 = torch.rand(1, 256, 8, 8)
+    # m4 = torch.rand(1, 8, 8)
+    # out = multiscaleformer([x1, x2, x3, x4], [m1, m2, m3, m4], nn.Embedding(10, 256).weight, [x1, x2, x3, x4])[0]
+    # print(out.shape)
