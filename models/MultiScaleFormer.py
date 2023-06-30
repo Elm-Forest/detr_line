@@ -340,7 +340,7 @@ def build_multiscaleformer(args):
         dropout=args.dropout,
         nhead=args.nheads,
         dim_feedforward=args.dim_feedforward,
-        num_encoder_layers=[2, 2, 2, 2],
+        num_encoder_layers=[args.enc_layers, args.enc_layers, args.enc_layers, args.enc_layers],
         num_decoder_layers=args.dec_layers,
         normalize_before=args.pre_norm,
         return_intermediate_dec=True
