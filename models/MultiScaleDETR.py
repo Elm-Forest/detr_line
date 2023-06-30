@@ -71,7 +71,7 @@ class MultiScaleDETR(nn.Module):
         p3, m3 = features[2].decompose()
         p4, m4 = features[3].decompose()
         # p5, temp = features[3].decompose()
-        p1 = self.input_proj2(p1)
+        p1 = self.input_proj1(p1)
         p2 = self.input_proj2(p2)
         p3 = self.input_proj3(p3)
         p4 = self.input_proj4(p4)
