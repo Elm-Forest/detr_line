@@ -52,7 +52,7 @@ class MultiScaleFormer(nn.Module):
         bs, c, h, w = src[0].shape
         src_ = src[0].flatten(2).permute(2, 0, 1)
         pos_ = pos_embed[0].flatten(2).permute(2, 0, 1)
-        pos_key = pos_.clonze()
+        pos_key = pos_.clone()
         mask_ = mask[0].flatten(1)
         mask_key = mask_.clone()
         memory1 = self.encoder_block1(value=src_,
