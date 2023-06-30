@@ -411,6 +411,19 @@ def build_MultiScaleDETR(args, data_loader):
     if args.transfer:
         print('Transfer Learning Mode~~')
         model.load_state_dict(checkpoint["model"], strict=False)
+        checkpoint = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True)
+        for i in range(args.enc_layers):
+            model.transformer.encoder_block1.layers[i].load_state_dict(
+                checkpoint.transformer.encoder.layers[0].state_dict())
+            model.transformer.encoder_block2.layers[i].load_state_dict(
+                checkpoint.transformer.encoder.layers[-1].state_dict())
+            model.transformer.encoder_block3.layers[i].load_state_dict(
+                checkpoint.transformer.encoder.layers[-1].state_dict())
+            model.transformer.encoder_block4.layers[i].load_state_dict(
+                checkpoint.transformer.encoder.layers[-1].state_dict())
+        del checkpoint
+        # model.transformer.encoder_block1[1] = checkpoint["model.transformer.encoder.layers[-1]"]
+        # model.transformer.encoder_block1[1] = checkpoint["model.transformer.encoder.layers[-1]"]
     if args.masks:
         model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))
     matcher = build_matcher(args)
