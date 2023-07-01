@@ -76,7 +76,7 @@ class MultiScaleFormer(nn.Module):
         mask_ = mask[2].flatten(1)
 
         memory3 = self.encoder_block3(value=src_,
-                                      query=memory2,
+                                      query=memory2 + memory1,
                                       src_key_padding_mask=mask_,
                                       pos_key=pos_,
                                       pos_query=pos_key)
@@ -86,7 +86,7 @@ class MultiScaleFormer(nn.Module):
         mask_ = mask[3].flatten(1)
 
         memory4 = self.encoder_block4(value=src_,
-                                      query=memory3,
+                                      query=memory3 + memory2,
                                       src_key_padding_mask=mask_,
                                       pos_key=pos_,
                                       pos_query=pos_key)
@@ -117,13 +117,14 @@ class TransformerEncoder(nn.Module):
                 pos_query: Optional[Tensor] = None):
 
         for layer in self.layers[:1]:
-            query = layer(value=query, query=query,
-                          src_mask=mask, src_key_padding_mask=None,
-                          pos_key=pos_query, pos_query=pos_query)
+            query_self_attn = layer(value=query, query=query,
+                                    src_mask=mask, src_key_padding_mask=None,
+                                    pos_key=pos_query, pos_query=pos_query)
         for layer in self.layers[1:]:
-            query = layer(value=value, query=query,
+            query = layer(value=value, query=query_self_attn,
                           src_mask=mask, src_key_padding_mask=src_key_padding_mask,
                           pos_key=pos_key, pos_query=pos_query)
+            query += query_self_attn + query
         if self.norm is not None:
             query = self.norm(query)
 
