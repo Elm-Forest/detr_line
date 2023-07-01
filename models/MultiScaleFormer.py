@@ -124,7 +124,8 @@ class TransformerEncoder(nn.Module):
             query = layer(value=value, query=query_self_attn,
                           src_mask=mask, src_key_padding_mask=src_key_padding_mask,
                           pos_key=pos_key, pos_query=pos_query)
-            query += query_self_attn + query
+            query_self_attn = query_self_attn + query
+        query = query_self_attn
         if self.norm is not None:
             query = self.norm(query)
 
