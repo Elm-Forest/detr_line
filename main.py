@@ -104,6 +104,7 @@ def get_args_parser():
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
 
     parser.add_argument('--scale', action='store_true')
+    parser.add_argument('--ori', action='store_true')
 
     # line detection
     parser.add_argument('--theta_res', default=3, type=int)
