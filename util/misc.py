@@ -4,21 +4,21 @@ Misc functions, including distributed helpers.
 
 Mostly copy-paste from torchvision references.
 """
+import datetime
 import os
+import pickle
 import subprocess
 import time
 from collections import defaultdict, deque
-import datetime
-import pickle
-from packaging import version
 from typing import Optional, List
 
 import torch
 import torch.distributed as dist
-from torch import Tensor
-
 # needed due to empty tensor bug in pytorch and torchvision 0.5
 import torchvision
+from packaging import version
+from torch import Tensor
+
 if version.parse(torchvision.__version__) < version.parse('0.7'):
     from torchvision.ops import _new_empty_tensor
     from torchvision.ops.misc import _output_size
@@ -251,6 +251,7 @@ def get_sha():
 
     def _run(command):
         return subprocess.check_output(command, cwd=cwd).decode('ascii').strip()
+
     sha = 'N/A'
     diff = "clean"
     branch = 'N/A'
@@ -466,3 +467,10 @@ def interpolate(input, size=None, scale_factor=None, mode="nearest", align_corne
         return _new_empty_tensor(input, output_shape)
     else:
         return torchvision.ops.misc.interpolate(input, size, scale_factor, mode, align_corners)
+
+
+def inverse_sigmoid(x, eps=1e-5):
+    x = x.clamp(min=0, max=1)
+    x1 = x.clamp(min=eps)
+    x2 = (1 - x).clamp(min=eps)
+    return torch.log(x1 / x2)

@@ -181,13 +181,12 @@ def build_powerline(image_set, args):
     return dataset
 
 
-def build_powerline_set(image_set, args):
+def build_powerline_test(image_set, args):
     root = Path(args.coco_path)
-    root2 = "D:/dataset/coco_powerline_1"
     assert root.exists(), f'provided COCO path {root} does not exist'
     PATHS = {
-        "train": (root / "images", root / "annotations" / 'train.json'),
-        "val": (root2 + "/train", root2 + "/annotations" + '/val.json'),
+        "train": (root / "train", root / "annotations" / 'train.json'),
+        "val": (root / "train", root / "annotations" / 'test.json'),
     }
 
     img_folder, ann_file = PATHS[image_set]
