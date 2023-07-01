@@ -76,7 +76,7 @@ class MultiScaleFormer(nn.Module):
         mask_ = mask[2].flatten(1)
 
         memory3 = self.encoder_block3(value=src_,
-                                      query=memory2 + memory1,
+                                      query=memory2,
                                       src_key_padding_mask=mask_,
                                       pos_key=pos_,
                                       pos_query=pos_key)
@@ -86,7 +86,7 @@ class MultiScaleFormer(nn.Module):
         mask_ = mask[3].flatten(1)
 
         memory4 = self.encoder_block4(value=src_,
-                                      query=memory3 + memory2,
+                                      query=memory3,
                                       src_key_padding_mask=mask_,
                                       pos_key=pos_,
                                       pos_query=pos_key)
